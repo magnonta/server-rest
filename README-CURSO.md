@@ -18,7 +18,11 @@ cd server-rest
 make check-prereqs
 ```
 
-**Se faltar alguma ferramenta**, veja o [Guia de Instalação](#️-instalação-de-ferramentas).
+**Se faltar alguma ferramenta**, veja o [Guia de Instalação Completo](INSTALL.md) ou use o setup interativo:
+
+```bash
+make setup-environment    # Verifica e oferece instalação automaticamente
+```
 
 ---
 
@@ -149,41 +153,58 @@ make test-zap               # Scan web com ZAP
 
 ## 🛠️ Instalação de Ferramentas
 
-### Ver Guia de Instalação
+👉 **[Ver Guia Completo de Instalação →](INSTALL.md)**
+
+O guia completo cobre:
+- ✅ Instalação automática para macOS, Linux (Ubuntu/Debian/Fedora/Arch), e WSL2
+- ✅ Instruções detalhadas por sistema operacional
+- ✅ Solução de problemas comuns
+- ✅ Verificação pós-instalação
+
+---
+
+### Setup Interativo (Recomendado)
+
+```bash
+make setup-environment
+```
+
+Este comando:
+1. Verifica quais ferramentas estão instaladas
+2. Oferece instalação automática do que está faltando
+3. Valida a instalação após completar
+
+**É o jeito mais fácil de começar!** 🚀
+
+---
+
+### Instalação Rápida
+
+```bash
+# Instalar tudo automaticamente
+make install-tools
+```
+
+Suporta:
+- ✅ macOS (via Homebrew)
+- ✅ Ubuntu/Debian (via apt)
+- ✅ Fedora/RHEL (via dnf/yum)
+- ✅ Arch Linux (via pacman)
+- ✅ WSL2 (detecta automaticamente)
+
+---
+
+### Ver Guia no Terminal
 
 ```bash
 make install-guide
 ```
 
-Este comando mostra **instruções detalhadas** para seu sistema operacional.
+Mostra instruções básicas diretamente no terminal.
 
 ---
 
-### Instalação Automatizada
-
-#### macOS
-
-```bash
-make install-tools
-```
-
-Instala tudo via Homebrew automaticamente.
-
----
-
-#### Linux / Ubuntu / WSL2
-
-```bash
-make install-tools
-```
-
-Instala via apt e scripts oficiais.
-
----
-
-#### Instalação Manual
-
-Se preferir instalar manualmente, você precisa de:
+### Ferramentas Necessárias
 
 | Ferramenta | Para que serve | Link |
 |------------|----------------|------|
@@ -205,9 +226,9 @@ Se preferir instalar manualmente, você precisa de:
 git clone https://github.com/magnonta/server-rest.git
 cd server-rest
 
-# 2. Verifique ferramentas
-make check-prereqs
-# Se faltar algo: make install-guide
+# 2. Verifique ferramentas (ou use setup interativo)
+make setup-environment
+# OU: make check-prereqs
 
 # 3. Crie ambiente
 make bootstrap

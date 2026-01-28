@@ -74,12 +74,17 @@ Você precisa ter instalado:
 **Não tem tudo instalado?**
 
 ```bash
-# Ver guia de instalação para seu sistema
-make install-guide
+# NOVO: Setup interativo (recomendado)
+make setup-environment
 
-# Ou instalar automaticamente (macOS/Linux)
+# OU: Instalar automaticamente (macOS/Linux)
 make install-tools
+
+# OU: Ver guia de instalação manual
+make install-guide
 ```
+
+👉 **[Ver guia completo de instalação →](INSTALL.md)**
 
 ---
 
@@ -149,7 +154,10 @@ make reset                  # Limpa e recria
 git clone https://github.com/magnonta/server-rest.git
 cd server-rest
 
-# Verifique as ferramentas
+# Setup interativo (verifica e oferece instalação se necessário)
+make setup-environment
+
+# OU verifique as ferramentas manualmente
 make check-prereqs
 
 # Crie o ambiente (2-3 minutos)
@@ -270,7 +278,8 @@ make logs           # Ver logs
 
 ## 📚 Recursos Adicionais
 
-- **[Documentação Completa](README-CURSO.md)** - Guia detalhado
+- **[Guia de Instalação](INSTALL.md)** - Instalação detalhada para todos os sistemas
+- **[Documentação Completa](README-CURSO.md)** - Guia detalhado do curso
 - **[ServeRest Original](https://github.com/ServeRest/ServeRest)** - Projeto base
 - **[Documentação da API](https://serverest.dev)** - Endpoints disponíveis
 
@@ -310,7 +319,7 @@ MIT License - Baseado no [ServeRest](https://github.com/ServeRest/ServeRest)
 ```bash
 git clone https://github.com/magnonta/server-rest.git
 cd server-rest
-make check-prereqs
+make setup-environment    # Setup interativo
 make bootstrap
 make lab-aula-01
 ```
