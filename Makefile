@@ -92,7 +92,7 @@ endif
 # PRÉ-REQUISITOS E VALIDAÇÃO
 # ============================================================================
 
-.PHONY: check-prereqs check-all-tools install-guide install-tools
+.PHONY: check-prereqs check-all-tools install-guide install-tools install-tools-macos install-tools-linux setup-environment
 
 ## check-prereqs: Verifica todas as ferramentas necessárias
 check-prereqs:
@@ -108,20 +108,46 @@ install-guide:
 	$(Q)bash $(SETUP_SCRIPTS)/show-install-guide.sh $(OS) $(IS_WSL)
 
 ## install-tools: Instala ferramentas automaticamente (requer sudo)
+## Detecta automaticamente o sistema operacional e instala todas as dependências
 install-tools:
-	$(call log,$(BOLD)Instalando ferramentas...$(RESET))
-ifeq ($(OS),Darwin)
+	$(call log,$(BOLD)Instalação Automática Inteligente...$(RESET))
+	$(Q)bash $(SETUP_SCRIPTS)/install-requirements.sh
+
+## install-tools-macos: Instalação específica para macOS (legado)
+install-tools-macos:
+	$(call log,$(BOLD)Instalando ferramentas - macOS...$(RESET))
 	$(Q)bash $(SETUP_SCRIPTS)/install-tools-macos.sh
-else ifeq ($(IS_WSL),true)
-	$(call log,$(YELLOW)WSL2 detectado - usando script Linux$(RESET))
+
+## install-tools-linux: Instalação específica para Linux (legado)
+install-tools-linux:
+	$(call log,$(BOLD)Instalando ferramentas - Linux...$(RESET))
 	$(Q)bash $(SETUP_SCRIPTS)/install-tools-linux.sh
-else ifeq ($(OS),Linux)
-	$(Q)bash $(SETUP_SCRIPTS)/install-tools-linux.sh
-else
-	$(call log,$(RED)Sistema não suportado. Use Windows PowerShell:$(RESET))
-	$(call log,$(YELLOW)  ./scripts/setup/install-tools-windows.ps1$(RESET))
-	$(Q)exit 1
-endif
+
+## setup-environment: Verifica requisitos e oferece instalação se necessário
+setup-environment:
+	@echo "$(BOLD)========================================$(RESET)"
+	@echo "$(BOLD)  VERIFICAÇÃO DO AMBIENTE$(RESET)"
+	@echo "$(BOLD)========================================$(RESET)"
+	@echo ""
+	@if bash $(SETUP_SCRIPTS)/verify-environment.sh > /dev/null 2>&1; then \
+		echo "$(GREEN)✅ Todos os requisitos estão instalados!$(RESET)"; \
+		echo ""; \
+		echo "$(BOLD)Próximo passo:$(RESET) make bootstrap"; \
+		echo ""; \
+	else \
+		echo "$(YELLOW)⚠️  Alguns requisitos estão faltando$(RESET)"; \
+		echo ""; \
+		echo "$(BOLD)Opções:$(RESET)"; \
+		echo "  1. Instalação automática: $(GREEN)make install-tools$(RESET)"; \
+		echo "  2. Ver guia de instalação: $(GREEN)make install-guide$(RESET)"; \
+		echo "  3. Verificar o que falta: $(GREEN)make check-prereqs$(RESET)"; \
+		echo ""; \
+		read -p "Deseja instalar automaticamente agora? [s/N] " -n 1 -r; \
+		echo ""; \
+		if [[ $$REPLY =~ ^[SsYy]$$ ]]; then \
+			$(MAKE) install-tools; \
+		fi \
+	fi
 
 # ============================================================================
 # CLUSTER KUBERNETES (KIND)
