@@ -404,12 +404,16 @@ test-trivy-k8s:
 test-zap:
 	$(call log,$(BOLD)OWASP ZAP Baseline Scan$(RESET))
 	$(call log,$(YELLOW)Certifique-se de que $(BASE_URL) está acessível$(RESET))
+	$(Q)mkdir -p security/reports
 	$(Q)docker run --rm \
 		--network host \
-		owasp/zap2docker-stable:$(ZAP_VERSION) \
+		-v $(PWD)/security/reports:/zap/wrk \
+		zaproxy/zap-stable:$(ZAP_VERSION) \
 		zap-baseline.py \
 		-t $(BASE_URL) \
-		-r /zap/wrk/zap-report.html
+		-r zap-report.html \
+		|| true
+	$(call log,$(YELLOW)⚠️  Relatório salvo em: security/reports/zap-report.html$(RESET))
 
 ## security-report: Relatório consolidado
 security-report:
