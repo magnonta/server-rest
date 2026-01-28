@@ -318,34 +318,34 @@ api-test:
 .PHONY: test-health test-smoke test-load-progressive test-stress test-spike test-soak test-load-all test-load test-load-suite
 
 ## test-health: Health check básico
-test-health: check-prereqs
+test-health: ensure-environment
 	$(call log,$(BOLD)Health Check$(RESET))
 	$(Q)BASE_URL=$(BASE_URL) k6 run $(K6_SCRIPTS_DIR)/00-health-check.js \
 		$(if $(filter 0,$(VERBOSE)),--quiet)
 
 ## test-smoke: Smoke test (1 VU)
-test-smoke: check-prereqs
+test-smoke: ensure-environment
 	$(call log,$(BOLD)Smoke Test$(RESET))
 	$(Q)BASE_URL=$(BASE_URL) k6 run $(K6_SCRIPTS_DIR)/01-smoke-test.js \
 		$(if $(filter 0,$(VERBOSE)),--quiet)
 
 ## test-load-progressive: Load test (10-20 VUs)
-test-load-progressive: check-prereqs
+test-load-progressive: ensure-environment
 	$(call log,$(BOLD)Load Test Progressivo$(RESET))
 	$(Q)BASE_URL=$(BASE_URL) k6 run $(K6_SCRIPTS_DIR)/02-load-test.js
 
 ## test-stress: Stress test (até 300 VUs)
-test-stress: check-prereqs
+test-stress: ensure-environment
 	$(call log,$(YELLOW)⚠️  Stress Test - Alta carga no sistema$(RESET))
 	$(Q)BASE_URL=$(BASE_URL) k6 run $(K6_SCRIPTS_DIR)/03-stress-test.js
 
 ## test-spike: Spike test (picos de carga)
-test-spike: check-prereqs
+test-spike: ensure-environment
 	$(call log,$(BOLD)Spike Test$(RESET))
 	$(Q)BASE_URL=$(BASE_URL) k6 run $(K6_SCRIPTS_DIR)/04-spike-test.js
 
 ## test-soak: Soak test (30 minutos)
-test-soak: check-prereqs
+test-soak: ensure-environment
 	$(call log,$(YELLOW)⚠️  Soak Test - Duração: 30 minutos$(RESET))
 	$(call log,$(YELLOW)Pressione CTRL+C para cancelar$(RESET))
 	$(Q)BASE_URL=$(BASE_URL) k6 run $(K6_SCRIPTS_DIR)/05-soak-test.js
@@ -360,7 +360,7 @@ test-load: test-health test-smoke test-load-progressive
 	$(call log,$(GREEN)✅ Testes rápidos concluídos$(RESET))
 
 ## test-load-suite: Executa suite via script externo (com relatório)
-test-load-suite: check-prereqs
+test-load-suite: ensure-environment
 	$(call log,$(BOLD)Executando suite completa de testes k6$(RESET))
 	$(Q)bash $(LOAD_SCRIPTS)/run-k6-suite.sh \
 		$(BASE_URL) \
@@ -475,7 +475,28 @@ debug-shell:
 # BOOTSTRAP E WORKFLOWS COMPLETOS
 # ============================================================================
 
-.PHONY: bootstrap setup lab-aula-01 lab-aula-02 demo status clean clean-all reset
+.PHONY: bootstrap setup ensure-environment lab-aula-01 lab-aula-02 demo status clean clean-all reset
+
+## ensure-environment: Garante que o ambiente está pronto (cria se necessário)
+ensure-environment: check-prereqs
+	$(Q)if ! kind get clusters 2>/dev/null | grep -q "^$(KIND_CLUSTER_NAME)$$"; then \
+		echo "$(YELLOW)⚠️  Cluster não encontrado. Criando ambiente...$(RESET)"; \
+		$(MAKE) bootstrap VERBOSE=$(VERBOSE); \
+	elif ! kubectl get namespace $(K8S_NAMESPACE) >/dev/null 2>&1; then \
+		echo "$(YELLOW)⚠️  Namespace não encontrado. Fazendo deploy...$(RESET)"; \
+		$(MAKE) metrics-install VERBOSE=$(VERBOSE); \
+		$(MAKE) deploy VERBOSE=$(VERBOSE); \
+		$(MAKE) port-forward VERBOSE=$(VERBOSE); \
+	elif ! kubectl get deployment -n $(K8S_NAMESPACE) serverest >/dev/null 2>&1; then \
+		echo "$(YELLOW)⚠️  Deployment não encontrado. Fazendo deploy...$(RESET)"; \
+		$(MAKE) deploy VERBOSE=$(VERBOSE); \
+		$(MAKE) port-forward VERBOSE=$(VERBOSE); \
+	elif ! nc -z localhost 30000 2>/dev/null; then \
+		echo "$(YELLOW)⚠️  Port-forward não está ativo. Ativando...$(RESET)"; \
+		$(MAKE) port-forward VERBOSE=$(VERBOSE); \
+	else \
+		echo "$(GREEN)✅ Ambiente já está pronto!$(RESET)"; \
+	fi
 
 ## bootstrap: Setup completo do zero
 bootstrap: check-prereqs
@@ -503,10 +524,12 @@ bootstrap: check-prereqs
 setup: bootstrap
 
 ## lab-aula-01: Workflow completo Aula 01 (Testes de Carga)
-lab-aula-01: bootstrap
+lab-aula-01: ensure-environment
 	$(call log,$(BOLD)========================================$(RESET))
 	$(call log,$(BOLD)  AULA 01: TESTES DE CARGA$(RESET))
 	$(call log,$(BOLD)========================================$(RESET))
+	$(Q)echo ""
+	$(call log,$(CYAN)Executando suite de testes de carga...$(RESET))
 	$(Q)echo ""
 	$(Q)$(MAKE) test-load VERBOSE=$(VERBOSE)
 	$(Q)echo ""
@@ -518,10 +541,17 @@ lab-aula-01: bootstrap
 	$(call log,  1. Em outro terminal: make watch-hpa)
 	$(call log,  2. Execute: make test-stress)
 	$(call log,  3. Observe HPA escalar os pods)
+	$(call log,  4. Testes individuais disponíveis:)
+	$(call log,     - make test-health)
+	$(call log,     - make test-smoke)
+	$(call log,     - make test-load-progressive)
+	$(call log,     - make test-stress)
+	$(call log,     - make test-spike)
+	$(call log,     - make test-soak)
 	$(Q)echo ""
 
 ## lab-aula-02: Workflow completo Aula 02 (Segurança)
-lab-aula-02: bootstrap
+lab-aula-02: ensure-environment
 	$(call log,$(BOLD)========================================$(RESET))
 	$(call log,$(BOLD)  AULA 02: TESTES DE SEGURANÇA$(RESET))
 	$(call log,$(BOLD)========================================$(RESET))
@@ -652,11 +682,19 @@ help:
 	$(Q)echo "$(BOLD)========================================$(RESET)"
 	$(Q)echo ""
 	$(Q)echo "$(BOLD)COMANDOS PRINCIPAIS:$(RESET)"
-	$(Q)echo "  $(GREEN)make bootstrap$(RESET)        Setup completo do ambiente"
-	$(Q)echo "  $(GREEN)make lab-aula-01$(RESET)      Workflow Aula 01 (Testes de Carga)"
-	$(Q)echo "  $(GREEN)make lab-aula-02$(RESET)      Workflow Aula 02 (Segurança)"
+	$(Q)echo "  $(GREEN)make bootstrap$(RESET)        Cria ambiente do ZERO"
+	$(Q)echo "  $(GREEN)make lab-aula-01$(RESET)      Workflow Aula 01 (auto-prepara ambiente)"
+	$(Q)echo "  $(GREEN)make lab-aula-02$(RESET)      Workflow Aula 02 (auto-prepara ambiente)"
 	$(Q)echo "  $(GREEN)make status$(RESET)           Status geral do ambiente"
 	$(Q)echo "  $(GREEN)make clean-all$(RESET)        Limpeza completa"
+	$(Q)echo ""
+	$(Q)echo "$(BOLD)TESTES INDIVIDUAIS:$(RESET)"
+	$(Q)echo "  $(CYAN)make test-health$(RESET)       Health check (verifica ambiente)"
+	$(Q)echo "  $(CYAN)make test-smoke$(RESET)        Smoke test (1 VU)"
+	$(Q)echo "  $(CYAN)make test-load$(RESET)         Load test (testes rápidos)"
+	$(Q)echo "  $(CYAN)make test-stress$(RESET)       Stress test (alta carga)"
+	$(Q)echo "  $(CYAN)make test-spike$(RESET)        Spike test (picos)"
+	$(Q)echo "  $(CYAN)make test-soak$(RESET)         Soak test (30 min)"
 	$(Q)echo ""
 	$(Q)echo "$(BOLD)AJUDA POR CATEGORIA:$(RESET)"
 	$(Q)echo "  $(YELLOW)make help-prereqs$(RESET)    Pré-requisitos e instalação"
@@ -696,6 +734,10 @@ help-prereqs:
 ## help-cluster: Ajuda sobre cluster
 help-cluster:
 	$(Q)echo "$(BOLD)CLUSTER KUBERNETES$(RESET)"
+	$(Q)echo ""
+	$(Q)echo "  $(GREEN)make bootstrap$(RESET)        Cria ambiente DO ZERO (cluster+metrics+deploy)"
+	$(Q)echo "  $(GREEN)make ensure-environment$(RESET) Verifica/prepara ambiente (inteligente)"
+	$(Q)echo ""
 	$(Q)echo "  make cluster-create   Cria cluster (3 nodes)"
 	$(Q)echo "  make cluster-status   Status do cluster"
 	$(Q)echo "  make cluster-delete   Remove cluster"
@@ -715,11 +757,17 @@ help-deploy:
 ## help-tests: Ajuda sobre testes
 help-tests:
 	$(Q)echo "$(BOLD)TESTES DE CARGA$(RESET)"
-	$(Q)echo "  make test-health      Health check"
-	$(Q)echo "  make test-smoke       Smoke test"
-	$(Q)echo "  make test-load        Testes rápidos"
-	$(Q)echo "  make test-stress      Stress test"
-	$(Q)echo "  make test-load-all    Todos os testes"
+	$(Q)echo "  $(CYAN)Todos verificam/preparam ambiente automaticamente$(RESET)"
+	$(Q)echo ""
+	$(Q)echo "  make test-health         Health check (rápido)"
+	$(Q)echo "  make test-smoke          Smoke test (1 VU)"
+	$(Q)echo "  make test-load           Testes rápidos (health+smoke+load)"
+	$(Q)echo "  make test-load-progressive  Load test progressivo"
+	$(Q)echo "  make test-stress         Stress test (alta carga)"
+	$(Q)echo "  make test-spike          Spike test (picos súbitos)"
+	$(Q)echo "  make test-soak           Soak test (30 minutos)"
+	$(Q)echo "  make test-load-all       Todos exceto soak"
+	$(Q)echo "  make test-load-suite     Suite completa com relatório"
 	$(Q)echo ""
 	$(Q)echo "$(BOLD)SEGURANÇA$(RESET)"
 	$(Q)echo "  make test-security    Todos os scans"
