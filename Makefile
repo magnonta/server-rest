@@ -92,7 +92,7 @@ endif
 # PRÉ-REQUISITOS E VALIDAÇÃO
 # ============================================================================
 
-.PHONY: check-prereqs check-all-tools install-guide install-tools install-tools-macos install-tools-linux setup-environment
+.PHONY: check-prereqs check-all-tools install-guide install-tools install-tools-macos install-tools-linux setup-environment test-installation
 
 ## check-prereqs: Verifica todas as ferramentas necessárias
 check-prereqs:
@@ -148,6 +148,12 @@ setup-environment:
 			$(MAKE) install-tools; \
 		fi \
 	fi
+
+## test-installation: Testa se todas as ferramentas estão funcionando corretamente
+## Executa smoke test completo: Docker, Kubernetes, k6
+test-installation:
+	$(call log,$(BOLD)Executando smoke test de instalação...$(RESET))
+	$(Q)bash $(SETUP_SCRIPTS)/test-installation.sh
 
 # ============================================================================
 # CLUSTER KUBERNETES (KIND)
@@ -681,9 +687,11 @@ help-full:
 ## help-prereqs: Ajuda sobre pré-requisitos
 help-prereqs:
 	$(Q)echo "$(BOLD)PRÉ-REQUISITOS$(RESET)"
-	$(Q)echo "  make check-prereqs    Verifica ferramentas instaladas"
-	$(Q)echo "  make install-guide    Guia de instalação (por SO)"
-	$(Q)echo "  make install-tools    Instala ferramentas (auto)"
+	$(Q)echo "  make check-prereqs      Verifica ferramentas instaladas"
+	$(Q)echo "  make setup-environment  Setup interativo (recomendado)"
+	$(Q)echo "  make install-tools      Instala ferramentas (auto)"
+	$(Q)echo "  make test-installation  Testa se tudo está funcionando"
+	$(Q)echo "  make install-guide      Guia de instalação (por SO)"
 
 ## help-cluster: Ajuda sobre cluster
 help-cluster:
