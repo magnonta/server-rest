@@ -1,404 +1,683 @@
 # 🎓 ServeRest - Curso DevOps QA
 
-> **Fork educacional do [ServeRest](https://github.com/ServeRest/ServeRest) para o Curso de DevOps QA - Pós-Graduação UNIESP**
-
-[![GitHub tag](https://img.shields.io/github/v/tag/magnonta/server-rest?style=for-the-badge)](https://github.com/magnonta/server-rest/tags)
-[![GitHub last commit](https://img.shields.io/github/last-commit/magnonta/server-rest?style=for-the-badge)](https://github.com/magnonta/server-rest/commits/curso-devops)
-[![License](https://img.shields.io/github/license/magnonta/server-rest?style=for-the-badge)](LICENSE)
+> **Repositório educacional para o Curso de DevOps QA - Pós-Graduação UNIESP**  
+> Testes de Carga e Segurança em CI/CD com Kubernetes
 
 ---
 
-## 📚 Sobre Este Repositório
+## 🚀 Como Usar Este Repositório - 3 Passos Simples
 
-Este repositório contém a **infraestrutura completa** para as aulas de **Testes de Carga** e **Testes de Segurança em CI/CD** do curso de pós-graduação em DevOps QA.
-
-### 🎯 O que foi adicionado ao ServeRest original?
-
-- ✅ **Makefile com 60+ comandos** para automação completa
-- ✅ **Kubernetes local** com kind (1 control-plane + 2 workers)
-- ✅ **6 cenários de testes de carga** com k6
-- ✅ **Testes de segurança** com Trivy e OWASP ZAP
-- ✅ **CI/CD pipelines** com GitHub Actions
-- ✅ **Documentação completa** (900+ linhas)
-- ✅ **15 scripts auxiliares** para setup, testes e monitoramento
-- ✅ **Slides das aulas** (282 slides em markdown)
-
----
-
-## 🚀 Quick Start
-
-### Pré-requisitos
-
-- Docker
-- kubectl
-- kind
-- k6
-- Node.js
-- npm
-
-### Setup em 1 Comando
-
-```bash
-# Verificar pré-requisitos
-make check-prereqs
-
-# Criar ambiente completo (cluster + metrics + deploy + port-forward)
-make bootstrap
-```
-
-**Tempo:** ~2-3 minutos
-
-### Workflows das Aulas
-
-#### 🧪 Aula 01: Testes de Carga em CI/CD
-
-```bash
-# Workflow completo (bootstrap + todos os testes de carga)
-make lab-aula-01
-```
-
-**Executa:**
-- Health check
-- Smoke test
-- Load test
-- Stress test
-- Spike test
-- Soak test
-
-**Tempo:** ~10-15 minutos
-
-#### 🔒 Aula 02: Testes de Segurança em CI/CD
-
-```bash
-# Workflow completo (bootstrap + todos os testes de segurança)
-make lab-aula-02
-```
-
-**Executa:**
-- Trivy scan (imagem Docker)
-- Trivy scan (Kubernetes manifests)
-- OWASP ZAP scan
-
-**Tempo:** ~5-10 minutos
-
----
-
-## 📖 Documentação
-
-| Documento | Descrição |
-|-----------|-----------|
-| [**Guia do Makefile**](docs/aulas/guias/MAKEFILE-GUIA.md) | Guia completo com todos os comandos (900+ linhas) |
-| [**Plano Geral**](docs/aulas/PLANO-GERAL.md) | Plano completo das 2 aulas (700+ linhas) |
-| [**Relatório de Testes**](docs/TESTE-LAB-RELATORIO.md) | Validação completa da infraestrutura |
-| [**Slides Aula 01**](docs/aulas/aula-01-testes-carga/slides/) | 5 apresentações (282 slides) |
-
-### 📂 Estrutura do Repositório
-
-```
-.
-├── Makefile                    # 750+ linhas de automação
-├── .env.make.example           # Template de configuração
-├── k6/                         # Testes de carga
-│   ├── scripts/                # 6 cenários de teste
-│   └── modules/                # Módulos reutilizáveis
-├── k8s/                        # Kubernetes
-│   ├── kind/                   # Configuração do cluster
-│   └── serverest/              # Manifests da aplicação
-├── scripts/                    # Scripts auxiliares
-│   ├── setup/                  # Instalação e verificação
-│   ├── k8s/                    # Helpers Kubernetes
-│   ├── load-testing/           # Suite k6
-│   └── security/               # Scans de segurança
-├── docs/                       # Documentação completa
-│   └── aulas/                  # Material das aulas
-├── .github/workflows/          # CI/CD pipelines
-└── security/                   # Configurações de segurança
-```
-
----
-
-## 🎯 Principais Comandos
-
-### Setup e Configuração
-
-```bash
-make bootstrap        # Setup completo (cluster + deploy + testes)
-make status           # Status do ambiente
-make clean-all        # Limpeza completa
-make reset            # Clean + bootstrap
-```
-
-### Testes de Carga
-
-```bash
-make test-health      # Health check (10 req)
-make test-smoke       # Smoke test (100 req)
-make test-load        # Load test (1000 req, 50 VUs)
-make test-stress      # Stress test (até 100 VUs)
-make test-spike       # Spike test (pico súbito)
-make test-soak        # Soak test (5 min)
-make test-load-all    # Todos os testes
-```
-
-### Testes de Segurança
-
-```bash
-make test-trivy       # Trivy completo
-make test-trivy-image # Scan imagem Docker
-make test-trivy-k8s   # Scan Kubernetes
-make test-zap         # OWASP ZAP
-make test-security    # Todos os testes
-```
-
-### Monitoramento
-
-```bash
-make logs             # Logs dos pods
-make logs-follow      # Seguir logs (Ctrl+C para sair)
-make top              # Recursos (CPU/Memória)
-make watch-hpa        # Monitorar HPA
-make events           # Eventos do cluster
-```
-
-### Ajuda
-
-```bash
-make help             # Ajuda resumida
-make help-full        # Ajuda completa
-make help-tests       # Ajuda sobre testes
-```
-
----
-
-## 🎓 Material das Aulas
-
-### Aula 01: Testes de Carga em CI/CD (8 horas)
-
-**Tópicos:**
-1. Introdução a Testes de Carga
-2. Kubernetes e kind
-3. Testes de Carga com k6
-4. CI/CD com GitHub Actions
-5. Revisão e Melhores Práticas
-
-**Slides:** [docs/aulas/aula-01-testes-carga/slides/](docs/aulas/aula-01-testes-carga/slides/)
-
-**Lab Prático:**
-```bash
-make lab-aula-01
-```
-
----
-
-### Aula 02: Testes de Segurança em CI/CD (8 horas)
-
-**Tópicos:**
-1. Fundamentos de Segurança em DevOps
-2. Scan de Vulnerabilidades (Trivy)
-3. OWASP ZAP e Testes de Segurança Web
-4. Integração com CI/CD
-5. Práticas de Segurança
-
-**Lab Prático:**
-```bash
-make lab-aula-02
-```
-
----
-
-## 🛠️ Tecnologias Utilizadas
-
-| Categoria | Tecnologia | Versão Mínima |
-|-----------|-----------|---------------|
-| **Container** | Docker | 20.10+ |
-| **Orchestração** | Kubernetes (kind) | 1.28+ |
-| **CLI** | kubectl | 1.28+ |
-| **Load Testing** | k6 | 0.45+ |
-| **Security Scanning** | Trivy | 0.45+ |
-| **Security Testing** | OWASP ZAP | 2.14+ |
-| **CI/CD** | GitHub Actions | - |
-| **Runtime** | Node.js | 18+ |
-| **Package Manager** | npm | 9+ |
-
----
-
-## 📊 Funcionalidades
-
-### Automação Completa (Makefile)
-
-- ✅ Verificação de pré-requisitos
-- ✅ Instalação automatizada (macOS/Linux)
-- ✅ Criação de cluster kind
-- ✅ Deploy de Metrics Server
-- ✅ Deploy da aplicação ServeRest
-- ✅ HPA (Horizontal Pod Autoscaler)
-- ✅ Port-forward em background
-- ✅ Suite completa de testes k6
-- ✅ Scans de segurança
-- ✅ Monitoramento e logs
-- ✅ Limpeza e reset
-
-### Testes de Carga (k6)
-
-1. **Health Check** (10 req, 1 VU, 10s)
-2. **Smoke Test** (100 req, 5 VUs, 20s)
-3. **Load Test** (1000 req, 50 VUs, ~20s)
-4. **Stress Test** (1→100 VUs, 5 min)
-5. **Spike Test** (1→100→1 VUs, 3 min)
-6. **Soak Test** (10 VUs, 5 min)
-
-### Testes de Segurança
-
-- **Trivy**: Scan de vulnerabilidades (imagem + K8s)
-- **OWASP ZAP**: Scan de vulnerabilidades web
-
-### CI/CD (GitHub Actions)
-
-- **Workflow Aula 01**: Load testing pipeline
-- **Workflow Aula 02**: Security testing pipeline
-
----
-
-## 🎨 Customização
-
-### Variáveis de Ambiente
-
-Copie e edite `.env.make`:
-
-```bash
-cp .env.make.example .env.make
-```
-
-**Variáveis disponíveis:**
-```bash
-KIND_CLUSTER_NAME=serverest-cluster
-K8S_NAMESPACE=serverest
-BASE_URL=http://localhost:30000
-POD_READY_TIMEOUT=120
-METRICS_WAIT_TIME=30
-VERBOSE=0
-```
-
-### Modo Verbose
-
-```bash
-make bootstrap VERBOSE=1
-make test-load VERBOSE=1
-```
-
----
-
-## 🔧 Troubleshooting
-
-### Problemas Comuns
-
-| Problema | Solução |
-|----------|---------|
-| Docker não está rodando | `systemctl start docker` (Linux) ou abrir Docker Desktop |
-| Porta 30000 em uso | `lsof -ti:30000 \| xargs kill -9` |
-| Cluster já existe | `make cluster-delete && make cluster-create` |
-| Pods não ficam prontos | `make events` e verificar logs |
-| Metrics Server não funciona | Aguardar 60s ou `make metrics-install` |
-
-### Ver Guia Completo
-
-Consulte o [Guia do Makefile](docs/aulas/guias/MAKEFILE-GUIA.md) para troubleshooting detalhado.
-
----
-
-## 📝 Compatibilidade
-
-| Sistema | Suporte |
-|---------|---------|
-| macOS | ✅ Totalmente suportado |
-| Linux/Ubuntu | ✅ Totalmente suportado |
-| WSL2 (Windows) | ✅ Totalmente suportado |
-| Windows PowerShell | ❌ Use WSL2 |
-
----
-
-## 🤝 Sobre o ServeRest Original
-
-Este fork é baseado no excelente projeto [ServeRest](https://github.com/ServeRest/ServeRest) criado por [Paulo Gonçalves](https://github.com/PauloGoncalvesBH).
-
-**Diferenças:**
-- ServeRest original: Foco em testes de API
-- Este fork: Foco em DevOps, CI/CD, Load Testing e Security Testing
-
-**Créditos ao projeto original:**
-- Documentação: https://serverest.dev
-- NPM: https://www.npmjs.com/package/serverest
-- Docker: https://hub.docker.com/r/paulogoncalvesbh/serverest
-
----
-
-## 📄 Licença
-
-Este projeto mantém a mesma licença do ServeRest original: **MIT License**
-
----
-
-## 👥 Autor do Fork Educacional
-
-**Professor:** Magno Oliveira  
-**Instituição:** UNIESP - Pós-Graduação  
-**Curso:** DevOps QA  
-**Período:** 2025  
-
----
-
-## 🌟 Versões
-
-- **v1.0-curso-devops** (Jan 2025): Release inicial com infraestrutura completa
-  - Makefile automation
-  - k6 load testing
-  - Security testing
-  - CI/CD pipelines
-  - Documentação completa
-
----
-
-## 📚 Links Úteis
-
-- [Guia do Makefile](docs/aulas/guias/MAKEFILE-GUIA.md)
-- [Plano das Aulas](docs/aulas/PLANO-GERAL.md)
-- [Slides Aula 01](docs/aulas/aula-01-testes-carga/slides/)
-- [Relatório de Testes](docs/TESTE-LAB-RELATORIO.md)
-
----
-
-## 🚀 Começar Agora
+### 1️⃣ Clone e Verifique
 
 ```bash
 # Clone o repositório
 git clone https://github.com/magnonta/server-rest.git
 cd server-rest
 
-# Checkout da branch do curso
-git checkout curso-devops
-
-# Verificar pré-requisitos
+# Verifique se tem todas as ferramentas instaladas
 make check-prereqs
+```
 
-# Setup completo
+**Se faltar alguma ferramenta**, veja o [Guia de Instalação](#️-instalação-de-ferramentas).
+
+---
+
+### 2️⃣ Crie o Ambiente
+
+```bash
+# Um único comando cria tudo automaticamente
 make bootstrap
+```
 
-# Executar lab da Aula 01
+**O que esse comando faz?**
+- ✅ Cria cluster Kubernetes local (kind)
+- ✅ Instala Metrics Server
+- ✅ Faz deploy da aplicação ServeRest
+- ✅ Configura acesso em http://localhost:30000
+- ✅ Testa se está tudo funcionando
+
+**Tempo:** 2-3 minutos ⏱️
+
+---
+
+### 3️⃣ Execute os Labs
+
+```bash
+# Para Aula 01 - Testes de Carga
 make lab-aula-01
 
-# Ver status
+# Para Aula 02 - Testes de Segurança
+make lab-aula-02
+
+# Para ver o status do ambiente
+make status
+```
+
+**Pronto!** 🎉 Você está rodando testes de carga e segurança em um cluster Kubernetes local!
+
+---
+
+## 📋 Comandos Mais Usados
+
+### Comandos Essenciais (Use Estes!)
+
+```bash
+# COMEÇAR
+make bootstrap              # Cria o ambiente completo
+make status                 # Ver status de tudo
+
+# TESTAR - CARGA
+make test-health            # Teste rápido (10 requisições)
+make test-load              # Teste de carga completo
+make lab-aula-01            # TODOS os testes de carga
+
+# TESTAR - SEGURANÇA
+make test-trivy             # Scan de segurança
+make test-zap               # Teste de vulnerabilidades web
+make lab-aula-02            # TODOS os testes de segurança
+
+# MONITORAR
+make logs                   # Ver logs dos pods
+make top                    # Ver uso de CPU/Memória
+make watch-hpa              # Ver escalabilidade em tempo real
+
+# LIMPAR
+make clean                  # Remove deploy
+make clean-all              # Remove tudo (cluster também)
+make reset                  # Limpa e recria tudo
+```
+
+---
+
+## 🎯 Workflows das Aulas
+
+### 🧪 Aula 01: Testes de Carga
+
+**Objetivo:** Aprender a fazer testes de carga em aplicações Kubernetes
+
+```bash
+# Workflow completo em 1 comando
+make lab-aula-01
+```
+
+**O que executa:**
+1. ✅ Cria ambiente (se não existir)
+2. ✅ Health Check - Verifica se API está OK
+3. ✅ Smoke Test - Teste leve (5 usuários)
+4. ✅ Load Test - Teste médio (50 usuários)
+5. ✅ Stress Test - Teste pesado (até 100 usuários)
+6. ✅ Spike Test - Teste de pico súbito
+7. ✅ Soak Test - Teste de duração (5 minutos)
+
+**Tempo total:** ~15 minutos
+
+**Comandos individuais:**
+```bash
+make test-health            # Apenas health check
+make test-smoke             # Apenas smoke test
+make test-load              # Apenas load test
+make test-stress            # Apenas stress test
+```
+
+---
+
+### 🔒 Aula 02: Testes de Segurança
+
+**Objetivo:** Aprender a fazer testes de segurança em aplicações Kubernetes
+
+```bash
+# Workflow completo em 1 comando
+make lab-aula-02
+```
+
+**O que executa:**
+1. ✅ Cria ambiente (se não existir)
+2. ✅ Trivy - Scan de vulnerabilidades na imagem Docker
+3. ✅ Trivy - Scan de configurações Kubernetes
+4. ✅ OWASP ZAP - Scan de vulnerabilidades web
+
+**Tempo total:** ~10 minutos
+
+**Comandos individuais:**
+```bash
+make test-trivy-image       # Scan da imagem Docker
+make test-trivy-k8s         # Scan do Kubernetes
+make test-zap               # Scan web com ZAP
+```
+
+---
+
+## 🛠️ Instalação de Ferramentas
+
+### Ver Guia de Instalação
+
+```bash
+make install-guide
+```
+
+Este comando mostra **instruções detalhadas** para seu sistema operacional.
+
+---
+
+### Instalação Automatizada
+
+#### macOS
+
+```bash
+make install-tools
+```
+
+Instala tudo via Homebrew automaticamente.
+
+---
+
+#### Linux / Ubuntu / WSL2
+
+```bash
+make install-tools
+```
+
+Instala via apt e scripts oficiais.
+
+---
+
+#### Instalação Manual
+
+Se preferir instalar manualmente, você precisa de:
+
+| Ferramenta | Para que serve | Link |
+|------------|----------------|------|
+| **Docker** | Rodar containers | https://www.docker.com/get-started |
+| **kubectl** | CLI do Kubernetes | https://kubernetes.io/docs/tasks/tools/ |
+| **kind** | Kubernetes local | https://kind.sigs.k8s.io/docs/user/quick-start/ |
+| **k6** | Testes de carga | https://k6.io/docs/get-started/installation/ |
+| **Node.js** | Runtime da aplicação | https://nodejs.org/ |
+| **npm** | Gerenciador de pacotes | Vem com Node.js |
+
+---
+
+## 🎬 Exemplo de Uso Completo
+
+### Primeira Vez (Aula 01)
+
+```bash
+# 1. Clone
+git clone https://github.com/magnonta/server-rest.git
+cd server-rest
+
+# 2. Verifique ferramentas
+make check-prereqs
+# Se faltar algo: make install-guide
+
+# 3. Crie ambiente
+make bootstrap
+# Aguarde 2-3 minutos
+
+# 4. Teste a API manualmente
+curl http://localhost:30000/usuarios
+
+# 5. Execute testes de carga
+make lab-aula-01
+# Aguarde ~15 minutos
+
+# 6. Veja o resultado
 make status
 
-# Limpar tudo
+# 7. Ao final da aula (opcional)
 make clean-all
+```
+
+---
+
+### Segunda Aula (Aula 02)
+
+```bash
+# Se já fez a Aula 01 e limpou, recrie o ambiente
+make bootstrap
+
+# Execute todos os testes de segurança
+make lab-aula-02
+
+# Veja os relatórios
+cat tmp/trivy-image-report.txt
+cat tmp/trivy-k8s-report.txt
+
+# Ao final
+make clean-all
+```
+
+---
+
+## 📊 Monitoramento Durante os Testes
+
+### Ver Tudo Acontecendo em Tempo Real
+
+Abra **3 terminais** e rode:
+
+```bash
+# Terminal 1 - Executar teste
+make test-load
+
+# Terminal 2 - Ver escalabilidade (HPA)
+make watch-hpa
+
+# Terminal 3 - Ver logs da aplicação
+make logs-follow
+```
+
+Você verá:
+- Terminal 1: Resultados do k6
+- Terminal 2: Pods sendo criados/destruídos automaticamente
+- Terminal 3: Logs da aplicação processando requisições
+
+**Pressione Ctrl+C** para sair dos comandos `watch-` e `logs-follow`.
+
+---
+
+## 🔧 Problemas Comuns
+
+### ❌ "Docker não está rodando"
+
+**Solução:**
+- **macOS/Windows:** Abra o Docker Desktop
+- **Linux:** `sudo systemctl start docker`
+
+---
+
+### ❌ "Porta 30000 já está em uso"
+
+**Solução:**
+```bash
+# Mata processo na porta 30000
+lsof -ti:30000 | xargs kill -9
+
+# Reinicia port-forward
+make port-forward
+```
+
+---
+
+### ❌ "Cluster já existe"
+
+**Solução:**
+```bash
+# Remove cluster antigo e cria novo
+make cluster-restart
+```
+
+---
+
+### ❌ "Pods não ficam prontos"
+
+**Solução:**
+```bash
+# Ver o que está acontecendo
+make events
+
+# Ver logs dos pods
+make logs
+
+# Se necessário, reinicie tudo
+make reset
+```
+
+---
+
+### ❌ "Métricas não aparecem (unknown/50%)"
+
+**Causa:** Metrics Server ainda não coletou dados.
+
+**Solução:**
+```bash
+# Aguarde 60 segundos
+sleep 60
+make status
+```
+
+---
+
+### 🆘 Nada Funciona?
+
+```bash
+# Limpeza completa e recriação
+make reset
+```
+
+Este comando:
+1. Para tudo
+2. Remove cluster
+3. Limpa estado
+4. Recria tudo do zero
+
+---
+
+## 📚 Comandos por Categoria
+
+### 🏗️ Setup e Ambiente
+
+```bash
+make check-prereqs          # Verifica ferramentas instaladas
+make install-guide          # Mostra como instalar
+make install-tools          # Instala automaticamente (macOS/Linux)
+make bootstrap              # Cria ambiente completo
+make status                 # Status geral
+make reset                  # Limpa e recria tudo
+```
+
+---
+
+### ☸️ Cluster Kubernetes
+
+```bash
+make cluster-create         # Cria cluster kind
+make cluster-delete         # Remove cluster
+make cluster-status         # Info do cluster
+make cluster-restart        # Reinicia cluster
+```
+
+---
+
+### 🚀 Deploy da Aplicação
+
+```bash
+make deploy                 # Faz deploy do ServeRest
+make undeploy               # Remove deploy
+make deploy-check           # Verifica status
+make port-forward           # Inicia acesso (localhost:30000)
+```
+
+---
+
+### 🧪 Testes de Carga (k6)
+
+```bash
+make test-health            # Health check (10 req, 10s)
+make test-smoke             # Smoke test (100 req, 5 VUs)
+make test-load              # Load test (1000 req, 50 VUs)
+make test-stress            # Stress test (até 100 VUs, 5min)
+make test-spike             # Spike test (pico súbito, 3min)
+make test-soak              # Soak test (10 VUs, 5min)
+make test-load-all          # TODOS os testes em sequência
+```
+
+---
+
+### 🔒 Testes de Segurança
+
+```bash
+make test-trivy             # Trivy completo (imagem + k8s)
+make test-trivy-image       # Scan de imagem Docker
+make test-trivy-k8s         # Scan de configs Kubernetes
+make test-zap               # OWASP ZAP scan
+make test-security          # TODOS os testes de segurança
+```
+
+---
+
+### 👀 Monitoramento e Debug
+
+```bash
+make logs                   # Últimos logs (100 linhas)
+make logs-follow            # Seguir logs em tempo real
+make top                    # CPU/Memória dos pods
+make watch-hpa              # Monitorar HPA em tempo real
+make events                 # Eventos do cluster
+make describe-pod           # Descrever pod (interativo)
+make debug-shell            # Shell dentro do pod (interativo)
+```
+
+---
+
+### 🧹 Limpeza
+
+```bash
+make clean                  # Remove deploy + para port-forward
+make clean-all              # Remove tudo (cluster também)
+make reset                  # clean-all + bootstrap
+```
+
+---
+
+### ❓ Ajuda
+
+```bash
+make help                   # Comandos principais
+make help-full              # Todos os comandos
+make help-prereqs           # Ajuda sobre instalação
+make help-cluster           # Ajuda sobre cluster
+make help-deploy            # Ajuda sobre deploy
+make help-tests             # Ajuda sobre testes
+make help-debug             # Ajuda sobre monitoramento
+```
+
+---
+
+## 🎨 Customização (Avançado)
+
+### Alterar Configurações
+
+```bash
+# Copie o arquivo de exemplo
+cp .env.make.example .env.make
+
+# Edite com seu editor preferido
+vim .env.make
+# ou
+nano .env.make
+```
+
+**Opções disponíveis:**
+```bash
+KIND_CLUSTER_NAME=serverest-cluster    # Nome do cluster
+K8S_NAMESPACE=serverest                # Namespace Kubernetes
+BASE_URL=http://localhost:30000        # URL da API
+POD_READY_TIMEOUT=120                  # Timeout para pods (segundos)
+METRICS_WAIT_TIME=30                   # Espera para métricas (segundos)
+VERBOSE=0                              # Modo verbose (0 ou 1)
+```
+
+---
+
+### Modo Verbose (Ver Detalhes)
+
+```bash
+# Adicione VERBOSE=1 em qualquer comando
+make bootstrap VERBOSE=1
+make test-load VERBOSE=1
+make status VERBOSE=1
+```
+
+Mostra todos os comandos executados em detalhe.
+
+---
+
+## 📁 Estrutura do Repositório
+
+```
+server-rest/
+├── Makefile                    # 750+ linhas de automação
+├── README-CURSO.md             # Este arquivo
+├── .env.make.example           # Template de configuração
+│
+├── k6/                         # Testes de carga
+│   ├── scripts/                # 6 cenários de teste
+│   │   ├── 00-health-check.js
+│   │   ├── 01-smoke-test.js
+│   │   ├── 02-load-test.js
+│   │   ├── 03-stress-test.js
+│   │   ├── 04-spike-test.js
+│   │   └── 05-soak-test.js
+│   └── modules/                # Módulos reutilizáveis
+│
+├── k8s/                        # Kubernetes
+│   ├── kind/
+│   │   └── kind-config.yaml    # Configuração do cluster
+│   └── serverest/              # Manifests da aplicação
+│       ├── 00-namespace.yaml
+│       ├── 01-configmap.yaml
+│       ├── 02-deployment.yaml
+│       ├── 03-service.yaml
+│       └── 04-hpa.yaml
+│
+├── scripts/                    # Scripts auxiliares
+│   ├── setup/                  # Instalação e verificação
+│   ├── k8s/                    # Helpers Kubernetes
+│   ├── load-testing/           # Suite k6
+│   └── security/               # Scans de segurança
+│
+├── .github/workflows/          # CI/CD pipelines
+│   ├── aula-01-load-testing.yml
+│   └── aula-02-security-full.yml
+│
+└── security/                   # Configurações de segurança
+    └── trivy/
+```
+
+---
+
+## 🎓 Informações do Curso
+
+**Curso:** DevOps para QA - Pós-Graduação  
+**Instituição:** UNIESP  
+**Carga Horária:** 16 horas (2 sábados de 8h cada)  
+
+**Módulos:**
+- **Aula 01 (8h):** Testes de Carga em CI/CD
+- **Aula 02 (8h):** Testes de Segurança em CI/CD
+
+---
+
+## 🛡️ Tecnologias Utilizadas
+
+| Tecnologia | Versão | Uso |
+|------------|--------|-----|
+| **Docker** | 20.10+ | Container runtime |
+| **Kubernetes (kind)** | 1.28+ | Orquestração local |
+| **kubectl** | 1.28+ | CLI Kubernetes |
+| **k6** | 0.45+ | Testes de carga |
+| **Trivy** | 0.45+ | Scan de segurança |
+| **OWASP ZAP** | 2.14+ | Testes de segurança web |
+| **Node.js** | 18+ | Runtime da aplicação |
+| **GitHub Actions** | - | CI/CD |
+
+---
+
+## 💡 Dicas para Aproveitar ao Máximo
+
+### 1. Comece Simples
+```bash
+make bootstrap
+make test-health
+make status
+```
+
+### 2. Use os Workflows Completos
+```bash
+# Deixe rodar tudo automaticamente
+make lab-aula-01
+make lab-aula-02
+```
+
+### 3. Monitore em Tempo Real
+```bash
+# Terminal 1
+make watch-hpa
+
+# Terminal 2
+make test-load
+```
+
+### 4. Explore os Comandos
+```bash
+make help-full
+```
+
+### 5. Quando Tiver Problemas
+```bash
+make events
+make logs
+make status
+```
+
+---
+
+## 🌐 Compatibilidade
+
+| Sistema | Status |
+|---------|--------|
+| macOS | ✅ Totalmente suportado |
+| Linux/Ubuntu | ✅ Totalmente suportado |
+| WSL2 (Windows) | ✅ Totalmente suportado |
+| Windows PowerShell | ❌ Use WSL2 |
+
+**Requisitos de Hardware:**
+- CPU: 4+ cores (8+ recomendado)
+- RAM: 8GB (16GB recomendado)
+- Disco: 20GB livres
+
+---
+
+## 📄 Licença
+
+Este projeto é baseado no [ServeRest](https://github.com/ServeRest/ServeRest) e mantém a licença **MIT**.
+
+**Créditos ao projeto original:**
+- Criado por [Paulo Gonçalves](https://github.com/PauloGoncalvesBH)
+- Documentação: https://serverest.dev
+- NPM: https://www.npmjs.com/package/serverest
+
+---
+
+## 🤝 Suporte
+
+### Durante as Aulas
+
+Pergunte ao professor ou colegas.
+
+### Problemas Técnicos
+
+1. Veja a seção [Problemas Comuns](#-problemas-comuns)
+2. Execute `make status` e `make events`
+3. Tente `make reset`
+
+### Modo Verbose
+
+Para debug detalhado:
+```bash
+make bootstrap VERBOSE=1
+```
+
+---
+
+## 🚀 Começar Agora
+
+```bash
+# 1. Clone
+git clone https://github.com/magnonta/server-rest.git
+cd server-rest
+
+# 2. Verifique
+make check-prereqs
+
+# 3. Crie
+make bootstrap
+
+# 4. Teste
+curl http://localhost:30000/usuarios
+
+# 5. Execute (escolha sua aula)
+make lab-aula-01    # Testes de Carga
+make lab-aula-02    # Testes de Segurança
 ```
 
 **Boa aula! 🎓**
 
 ---
 
-<details>
-<summary>📖 README do ServeRest Original (clique para expandir)</summary>
+## 📞 Informações
 
----
+**Repositório:** https://github.com/magnonta/server-rest  
+**Branch Principal:** `curso-devops`  
+**Versão:** v1.0-curso-devops  
 
+**Última Atualização:** Janeiro 2025
