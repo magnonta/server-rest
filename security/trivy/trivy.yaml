@@ -1,0 +1,34 @@
+# Configuração do Trivy para scanning de vulnerabilidades
+# Documentação: https://aquasecurity.github.io/trivy/
+
+# Severidades a reportar
+severity:
+  - CRITICAL
+  - HIGH
+  - MEDIUM
+  - LOW
+
+# Tipos de vulnerabilidades a scanear
+vuln-type:
+  - os
+  - library
+
+# Formato do output
+format: json
+
+# Ignorar vulnerabilidades não corrigidas
+ignore-unfixed: false
+
+# Timeout
+timeout: 10m
+
+# Cache
+cache:
+  backend: fs
+  dir: /tmp/trivy-cache
+
+# Escaneamento de licenças (opcional)
+scanners:
+  - vuln
+  - config
+  - secret

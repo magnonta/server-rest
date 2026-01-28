@@ -1,0 +1,116 @@
+# Deployment do ServeRest
+# Define como a aplicação será executada no cluster
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: serverest
+  namespace: serverest
+  labels:
+    app: serverest
+    version: v1
+spec:
+  # Número inicial de réplicas
+  # O HPA ajustará este número automaticamente
+  replicas: 2
+  
+  # Seletor para identificar os pods deste deployment
+  selector:
+    matchLabels:
+      app: serverest
+  
+  # Estratégia de atualização
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  
+  # Template do Pod
+  template:
+    metadata:
+      labels:
+        app: serverest
+        version: v1
+    spec:
+      containers:
+      - name: serverest
+        # Imagem do ServeRest do Docker Hub
+        image: paulogoncalvesbh/serverest:latest
+        imagePullPolicy: Always
+        
+        # Portas expostas
+        ports:
+        - containerPort: 3000
+          name: http
+          protocol: TCP
+        
+        # Variáveis de ambiente do ConfigMap
+        envFrom:
+        - configMapRef:
+            name: serverest-config
+        
+        # Resource requests e limits (IMPORTANTE para HPA)
+        resources:
+          requests:
+            # CPU necessária para o pod ser criado
+            cpu: 100m
+            # Memória necessária para o pod ser criado
+            memory: 200Mi
+          limits:
+            # Máximo de CPU que o pod pode usar
+            cpu: 500m
+            # Máximo de memória que o pod pode usar
+            memory: 512Mi
+        
+        # Probes para health checking
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        
+        # Startup probe para apps que demoram a iniciar
+        startupProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 0
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 12
+        
+        # Volume para dados do ServeRest (banco de dados local)
+        volumeMounts:
+        - name: data
+          mountPath: /app/src/data
+      
+      # Volumes
+      volumes:
+      - name: data
+        emptyDir: {}
+      
+      # Anti-affinity para distribuir pods em nodes diferentes (opcional)
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - serverest
+              topologyKey: kubernetes.io/hostname

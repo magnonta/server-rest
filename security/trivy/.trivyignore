@@ -1,0 +1,8 @@
+# .trivyignore
+# CVEs a serem ignorados (com justificativa)
+
+# Exemplo: CVE-2021-xxxxx - Não afeta nossa versão específica
+# CVE-2021-xxxxx
+
+# Adicione aqui CVEs que foram analisados e aceitos
+# Sempre adicionar comentário explicando o motivo

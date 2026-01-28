@@ -1,0 +1,127 @@
+name: Aula 01 - Load Testing Pipeline
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'k6/**'
+      - 'k8s/**'
+      - '.github/workflows/aula-01-load-testing.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'k6/**'
+      - 'k8s/**'
+
+env:
+  BASE_URL: http://localhost:3000
+
+jobs:
+  load-testing:
+    name: Load Testing com k6
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+      
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Criar cluster kind
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: serverest-test
+          config: k8s/kind/kind-config.yaml
+          wait: 60s
+      
+      - name: Verificar cluster
+        run: |
+          kubectl cluster-info
+          kubectl get nodes
+      
+      - name: Instalar metrics-server
+        run: |
+          kubectl apply -f k8s/kind/metrics-server.yaml
+          kubectl wait --for=condition=ready pod -l k8s-app=metrics-server -n kube-system --timeout=90s
+          kubectl top nodes || true
+      
+      - name: Deploy ServeRest
+        run: |
+          kubectl apply -f k8s/serverest/
+          kubectl wait --for=condition=ready pod -l app=serverest -n serverest --timeout=120s
+          kubectl get all -n serverest
+      
+      - name: Port forward ServeRest
+        run: |
+          kubectl port-forward -n serverest svc/serverest 3000:3000 &
+          sleep 5
+          curl -f http://localhost:3000 || exit 1
+      
+      - name: Setup k6
+        uses: grafana/setup-k6-action@v1
+      
+      - name: Health Check
+        run: |
+          k6 run k6/scripts/00-health-check.js
+      
+      - name: Smoke Test
+        run: |
+          k6 run k6/scripts/01-smoke-test.js
+      
+      - name: Load Test
+        run: |
+          k6 run k6/scripts/02-load-test.js --out json=k6/results/load-test-results.json
+        continue-on-error: true
+      
+      - name: Verificar HPA
+        run: |
+          echo "=== HPA Status ==="
+          kubectl get hpa -n serverest
+          echo ""
+          echo "=== Pods Status ==="
+          kubectl get pods -n serverest
+          echo ""
+          echo "=== Pod Metrics ==="
+          kubectl top pods -n serverest || echo "Metrics not available yet"
+      
+      - name: Upload relatórios k6
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: k6-reports
+          path: |
+            k6/results/*.json
+            k6/results/*.html
+          retention-days: 30
+      
+      - name: Comentar PR com resultados
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            try {
+              const results = JSON.parse(fs.readFileSync('k6/results/load-test-results.json', 'utf8'));
+              const comment = `## 📊 Resultados do Load Test
+              
+              **Métricas principais:**
+              - Total de requisições: ${results.metrics.http_reqs?.values?.count || 'N/A'}
+              - Taxa de erro: ${(results.metrics.http_req_failed?.values?.rate * 100).toFixed(2)}%
+              - Tempo médio: ${results.metrics.http_req_duration?.values?.avg.toFixed(2)}ms
+              - p95: ${results.metrics.http_req_duration?.values?.['p(95)']?.toFixed(2)}ms
+              - p99: ${results.metrics.http_req_duration?.values?.['p(99)']?.toFixed(2)}ms
+              
+              ✅ **Status**: ${results.metrics.http_req_failed?.values?.rate < 0.01 ? 'PASSED' : 'FAILED'}
+              `;
+              
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: comment
+              });
+            } catch (error) {
+              console.log('Erro ao processar resultados:', error);
+            }

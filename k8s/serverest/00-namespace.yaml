@@ -1,0 +1,9 @@
+# Namespace para a aplicação ServeRest
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: serverest
+  labels:
+    name: serverest
+    environment: development
+    app: serverest

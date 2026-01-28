@@ -2,6 +2,10 @@
 .stryker-tmp
 stryker.log
 
+docs/
+
+.opencode/
+
 # Dependency directories
 .idea/
 .nyc_output/
@@ -22,3 +26,30 @@ tmp/
 *.swp
 *.tgz
 gcloud-flags.yaml
+
+# Aulas DevOps - Arquivos gerados
+k6/results/*
+!k6/results/.gitkeep
+security/reports/*
+!security/reports/.gitkeep
+examples/k6-results/*
+!examples/k6-results/.gitkeep
+examples/security-reports/*
+!examples/security-reports/.gitkeep
+examples/screenshots/*
+!examples/screenshots/.gitkeep
+
+# Trivy cache
+.trivy/
+trivy-cache/
+
+# ZAP
+zap.log
+zap-output/
+
+# Makefile artifacts
+.make-state/
+*.pid
+Makefile.original-backup
+.env.make
+/tmp/kind-logs-*

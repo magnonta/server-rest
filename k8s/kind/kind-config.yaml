@@ -1,0 +1,20 @@
+# Configuração do cluster kind para as aulas de DevOps
+# Este cluster possui 1 control-plane e 2 worker nodes para demonstrar scaling
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+
+# Nodes
+nodes:
+  # Control plane node
+  - role: control-plane
+    extraPortMappings:
+    # Porta para acessar o ServeRest localmente via NodePort
+    - containerPort: 30000
+      hostPort: 30000
+      protocol: TCP
+
+  # Worker node 1
+  - role: worker
+
+  # Worker node 2
+  - role: worker

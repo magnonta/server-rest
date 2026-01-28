@@ -1,0 +1,296 @@
+name: Aula 02 - Security Scanning Pipeline
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '0 2 * * 1' # Toda segunda-feira às 2h
+
+env:
+  TRIVY_VERSION: 0.48.0
+
+jobs:
+  dependency-scan:
+    name: SCA - Dependency Scanning
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: npm audit
+        run: |
+          npm audit --json > security/reports/npm-audit.json || true
+          npm audit
+        continue-on-error: true
+      
+      - name: Install Trivy
+        run: |
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+          echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update
+          sudo apt-get install trivy
+      
+      - name: Trivy dependency scan
+        run: |
+          trivy fs \
+            --scanners vuln \
+            --severity CRITICAL,HIGH,MEDIUM \
+            --format json \
+            --output security/reports/trivy-dependencies.json \
+            .
+        continue-on-error: true
+      
+      - name: Check for CRITICAL vulnerabilities
+        run: |
+          CRITICAL=$(cat security/reports/trivy-dependencies.json | jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length')
+          echo "Found $CRITICAL CRITICAL vulnerabilities"
+          if [ "$CRITICAL" -gt 0 ]; then
+            echo "❌ CRITICAL vulnerabilities found! Please fix before merging."
+            exit 1
+          fi
+        continue-on-error: true
+      
+      - name: Upload dependency scan results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dependency-scan-results
+          path: security/reports/*
+          retention-days: 30
+
+  dockerfile-lint:
+    name: Dockerfile Linting
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+      
+      - name: hadolint
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+          failure-threshold: warning
+
+  container-scan:
+    name: Container Image Scanning
+    runs-on: ubuntu-latest
+    needs: dockerfile-lint
+    
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          load: true
+          tags: serverest:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Install Trivy
+        run: |
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+          echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update
+          sudo apt-get install trivy
+      
+      - name: Trivy image scan
+        run: |
+          trivy image \
+            --severity CRITICAL,HIGH \
+            --format json \
+            --output security/reports/trivy-image.json \
+            serverest:test
+        continue-on-error: true
+      
+      - name: Trivy image scan (table output)
+        run: |
+          trivy image \
+            --severity CRITICAL,HIGH \
+            serverest:test
+        continue-on-error: true
+      
+      - name: Check for CRITICAL vulnerabilities in image
+        run: |
+          CRITICAL=$(cat security/reports/trivy-image.json | jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length')
+          echo "Found $CRITICAL CRITICAL vulnerabilities in container image"
+          if [ "$CRITICAL" -gt 5 ]; then
+            echo "⚠️ Too many CRITICAL vulnerabilities! Consider updating base image."
+          fi
+        continue-on-error: true
+      
+      - name: Upload container scan results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: container-scan-results
+          path: security/reports/trivy-image.json
+          retention-days: 30
+
+  secret-scan:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Install Trivy
+        run: |
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+          echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update
+          sudo apt-get install trivy
+      
+      - name: Trivy secret scan
+        run: |
+          trivy fs \
+            --scanners secret \
+            --format json \
+            --output security/reports/trivy-secrets.json \
+            .
+        continue-on-error: true
+      
+      - name: Check for secrets
+        run: |
+          SECRETS=$(cat security/reports/trivy-secrets.json | jq '[.Results[]?.Secrets[]?] | length')
+          echo "Found $SECRETS potential secrets"
+          if [ "$SECRETS" -gt 0 ]; then
+            echo "⚠️ Potential secrets found! Review security/reports/trivy-secrets.json"
+            trivy fs --scanners secret .
+          fi
+        continue-on-error: true
+      
+      - name: Upload secret scan results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: secret-scan-results
+          path: security/reports/trivy-secrets.json
+          retention-days: 30
+
+  dast:
+    name: DAST - OWASP ZAP Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      
+      - name: Iniciar ServeRest
+        run: |
+          npm ci
+          npm start &
+          sleep 10
+          curl -f http://localhost:3000 || exit 1
+      
+      - name: OWASP ZAP Baseline Scan
+        uses: zaproxy/action-baseline@v0.10.0
+        with:
+          target: 'http://localhost:3000'
+          rules_file_name: 'security/zap/rules.conf'
+          cmd_options: '-a -j'
+          allow_issue_writing: false
+          fail_action: false
+      
+      - name: Upload ZAP results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zap-scan-results
+          path: |
+            report_html.html
+            report_json.json
+          retention-days: 30
+
+  security-report:
+    name: Consolidar Relatório de Segurança
+    runs-on: ubuntu-latest
+    needs: [dependency-scan, container-scan, secret-scan, dast]
+    if: always()
+    
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+      
+      - name: Gerar relatório consolidado
+        run: |
+          echo "# 🔒 Relatório de Segurança - $(date +'%Y-%m-%d %H:%M:%S')" > SECURITY_REPORT.md
+          echo "" >> SECURITY_REPORT.md
+          echo "## 📦 Dependency Scan (npm audit + Trivy)" >> SECURITY_REPORT.md
+          echo "" >> SECURITY_REPORT.md
+          if [ -f dependency-scan-results/trivy-dependencies.json ]; then
+            CRITICAL=$(cat dependency-scan-results/trivy-dependencies.json | jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length')
+            HIGH=$(cat dependency-scan-results/trivy-dependencies.json | jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")] | length')
+            MEDIUM=$(cat dependency-scan-results/trivy-dependencies.json | jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="MEDIUM")] | length')
+            echo "- 🔴 CRITICAL: $CRITICAL" >> SECURITY_REPORT.md
+            echo "- 🟠 HIGH: $HIGH" >> SECURITY_REPORT.md
+            echo "- 🟡 MEDIUM: $MEDIUM" >> SECURITY_REPORT.md
+          fi
+          echo "" >> SECURITY_REPORT.md
+          echo "## 🐳 Container Scan (Trivy Image)" >> SECURITY_REPORT.md
+          echo "" >> SECURITY_REPORT.md
+          if [ -f container-scan-results/trivy-image.json ]; then
+            CRITICAL=$(cat container-scan-results/trivy-image.json | jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length')
+            HIGH=$(cat container-scan-results/trivy-image.json | jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")] | length')
+            echo "- 🔴 CRITICAL: $CRITICAL" >> SECURITY_REPORT.md
+            echo "- 🟠 HIGH: $HIGH" >> SECURITY_REPORT.md
+          fi
+          echo "" >> SECURITY_REPORT.md
+          echo "## 🔑 Secret Scan" >> SECURITY_REPORT.md
+          echo "" >> SECURITY_REPORT.md
+          if [ -f secret-scan-results/trivy-secrets.json ]; then
+            SECRETS=$(cat secret-scan-results/trivy-secrets.json | jq '[.Results[]?.Secrets[]?] | length')
+            echo "- Potential secrets found: $SECRETS" >> SECURITY_REPORT.md
+          fi
+          echo "" >> SECURITY_REPORT.md
+          echo "## 🎯 DAST - OWASP ZAP" >> SECURITY_REPORT.md
+          echo "" >> SECURITY_REPORT.md
+          echo "Ver relatório HTML em artifacts" >> SECURITY_REPORT.md
+          
+          cat SECURITY_REPORT.md
+      
+      - name: Upload consolidated report
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-consolidated-report
+          path: SECURITY_REPORT.md
+          retention-days: 90
+      
+      - name: Comment PR with security summary
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('SECURITY_REPORT.md', 'utf8');
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: report
+            });

@@ -1,0 +1,21 @@
+# ConfigMap com configurações da aplicação ServeRest
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: serverest-config
+  namespace: serverest
+  labels:
+    app: serverest
+data:
+  # Porta da aplicação
+  PORT: "3000"
+  
+  # Ambiente
+  NODE_ENV: "production"
+  ENVIRONMENT: "kubernetes"
+  
+  # Timeout (em milissegundos)
+  TIMEOUT: "60000"
+  
+  # Segurança (desabilitado para testes de carga)
+  SECURITY: "false"
