@@ -2,7 +2,7 @@
 .stryker-tmp
 stryker.log
 
-docs/
+# docs/ - Comentado para permitir versionamento do swagger.json necessário para CI/CD
 
 .opencode/
 
