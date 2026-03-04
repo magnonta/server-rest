@@ -1,0 +1,133 @@
+name: Pipeline - Standalone (npm)
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_health:
+        description: 'Executar Health Check'
+        type: boolean
+        default: true
+      test_smoke:
+        description: 'Executar Smoke Test'
+        type: boolean
+        default: true
+      test_load:
+        description: 'Executar Load Test'
+        type: boolean
+        default: true
+      test_stress:
+        description: 'Executar Stress Test'
+        type: boolean
+        default: false
+      test_spike:
+        description: 'Executar Spike Test'
+        type: boolean
+        default: false
+      test_soak:
+        description: 'Executar Soak Test (40 min)'
+        type: boolean
+        default: false
+
+env:
+  BASE_URL: http://localhost:3000
+
+jobs:
+  load-testing-standalone:
+    name: Load Testing (Standalone)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout codigo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Iniciar ServeRest
+        run: |
+          npm start &
+          echo "Aguardando ServeRest iniciar..."
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3000 > /dev/null 2>&1; then
+              echo "ServeRest esta online!"
+              break
+            fi
+            echo "Tentativa $i/30..."
+            sleep 2
+          done
+          curl -f http://localhost:3000 || { echo "ERRO: ServeRest nao iniciou"; exit 1; }
+
+      - name: Setup k6
+        uses: grafana/setup-k6-action@v1
+
+      # ---- Testes de Carga ----
+
+      - name: Health Check
+        if: inputs.test_health
+        run: k6 run k6/scripts/00-health-check.js
+
+      - name: Smoke Test
+        if: inputs.test_smoke
+        run: k6 run k6/scripts/01-smoke-test.js
+
+      - name: Load Test
+        if: inputs.test_load
+        run: k6 run k6/scripts/02-load-test.js
+        continue-on-error: true
+
+      - name: Stress Test
+        if: inputs.test_stress
+        run: k6 run k6/scripts/03-stress-test.js
+        continue-on-error: true
+
+      - name: Spike Test
+        if: inputs.test_spike
+        run: k6 run k6/scripts/04-spike-test.js
+        continue-on-error: true
+
+      - name: Soak Test
+        if: inputs.test_soak
+        run: k6 run k6/scripts/05-soak-test.js
+        continue-on-error: true
+
+      # ---- Relatorios ----
+
+      - name: Upload relatorios k6
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: k6-standalone-reports
+          path: |
+            k6/results/*.json
+            k6/results/*.html
+          retention-days: 30
+
+      - name: Resumo dos resultados
+        if: always()
+        run: |
+          echo "## Resultados - Load Testing (Standalone)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Modo:** npm start (sem Kubernetes)" >> $GITHUB_STEP_SUMMARY
+          echo "**BASE_URL:** $BASE_URL" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Testes executados" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Teste | Selecionado |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Health Check | ${{ inputs.test_health }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Smoke Test | ${{ inputs.test_smoke }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Load Test | ${{ inputs.test_load }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Stress Test | ${{ inputs.test_stress }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Spike Test | ${{ inputs.test_spike }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Soak Test | ${{ inputs.test_soak }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Relatorios" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Baixe os relatorios JSON e HTML na aba **Artifacts**." >> $GITHUB_STEP_SUMMARY
