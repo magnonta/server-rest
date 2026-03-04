@@ -38,7 +38,7 @@ jobs:
     timeout-minutes: 90
 
     steps:
-      - name: Checkout codigo
+      - name: Checkout código
         uses: actions/checkout@v4
 
       - name: Setup Node.js
@@ -47,7 +47,7 @@ jobs:
           node-version: '18'
           cache: 'npm'
 
-      - name: Instalar dependencias
+      - name: Instalar dependências
         run: npm ci
 
       - name: Iniciar ServeRest
@@ -99,7 +99,7 @@ jobs:
 
       # ---- Relatorios ----
 
-      - name: Upload relatorios k6
+      - name: Upload relatórios k6
         uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -128,6 +128,6 @@ jobs:
           echo "| Spike Test | ${{ inputs.test_spike }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Soak Test | ${{ inputs.test_soak }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Relatorios" >> $GITHUB_STEP_SUMMARY
+          echo "### Relatórios" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Baixe os relatorios JSON e HTML na aba **Artifacts**." >> $GITHUB_STEP_SUMMARY
+          echo "Baixe os relatórios JSON e HTML na aba **Artifacts**." >> $GITHUB_STEP_SUMMARY
