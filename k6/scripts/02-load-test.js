@@ -5,7 +5,7 @@
 // Uso: k6 run k6/scripts/02-load-test.js
 
 import { group, check, sleep } from 'k6';
-import { BASE_URL, DEFAULT_THRESHOLDS, LOAD_STAGES } from '../modules/config.js';
+import { BASE_URL, DEFAULT_THRESHOLDS, getStages } from '../modules/config.js';
 import {
   criarUsuario,
   fazerLogin,
@@ -16,7 +16,7 @@ import {
 } from '../modules/serverest-api.js';
 
 export const options = {
-  stages: LOAD_STAGES,
+  stages: getStages('load'),
   thresholds: {
     ...DEFAULT_THRESHOLDS,
     // Durante load test, aceitamos tempos um pouco maiores

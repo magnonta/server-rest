@@ -6,14 +6,14 @@
 
 import http from 'k6/http';
 import { check, group, sleep } from 'k6';
-import { BASE_URL, DEFAULT_THRESHOLDS, SMOKE_STAGES } from '../modules/config.js';
+import { BASE_URL, DEFAULT_THRESHOLDS, getStages } from '../modules/config.js';
 import { 
   listarUsuarios, 
   listarProdutos 
 } from '../modules/serverest-api.js';
 
 export const options = {
-  stages: SMOKE_STAGES,
+  stages: getStages('smoke'),
   thresholds: {
     ...DEFAULT_THRESHOLDS,
     // Smoke test deve ter resposta muito rápida

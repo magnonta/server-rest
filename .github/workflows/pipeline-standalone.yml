@@ -30,6 +30,7 @@ on:
 
 env:
   BASE_URL: http://localhost:3000
+  K6_CI: true
 
 jobs:
   load-testing-standalone:

@@ -32,6 +32,7 @@ env:
   BASE_URL: http://localhost:3000
   K6_WEB_DASHBOARD: true
   K6_WEB_DASHBOARD_OPEN: false
+  K6_CI: true
 
 jobs:
   load-testing-kubernetes:

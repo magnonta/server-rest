@@ -6,7 +6,7 @@
 
 import { group, check, sleep } from 'k6';
 import { Rate } from 'k6/metrics';
-import { BASE_URL, SPIKE_STAGES } from '../modules/config.js';
+import { BASE_URL, getStages } from '../modules/config.js';
 import {
   listarProdutos,
   listarUsuarios,
@@ -17,7 +17,7 @@ import {
 const spikeSuccessRate = new Rate('spike_success_rate');
 
 export const options = {
-  stages: SPIKE_STAGES,
+  stages: getStages('spike'),
   thresholds: {
     // Durante spikes, aceitamos degradação temporária
     'http_req_duration': ['p(95)<3000'], // 3s

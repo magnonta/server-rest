@@ -6,7 +6,7 @@
 
 import { group, check, sleep } from 'k6';
 import { Trend, Counter } from 'k6/metrics';
-import { BASE_URL, SOAK_STAGES } from '../modules/config.js';
+import { BASE_URL, getStages } from '../modules/config.js';
 import {
   criarUsuario,
   fazerLogin,
@@ -20,7 +20,7 @@ const responseTimeTrend = new Trend('custom_response_time');
 const businessErrors = new Counter('business_errors');
 
 export const options = {
-  stages: SOAK_STAGES,
+  stages: getStages('soak'),
   thresholds: {
     // Soak test deve manter qualidade por longo período
     'http_req_duration': ['p(95)<1000'],

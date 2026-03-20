@@ -6,7 +6,7 @@
 
 import { group, check, sleep } from 'k6';
 import { Counter } from 'k6/metrics';
-import { BASE_URL, STRESS_STAGES } from '../modules/config.js';
+import { BASE_URL, getStages } from '../modules/config.js';
 import {
   criarUsuario,
   fazerLogin,
@@ -19,7 +19,7 @@ import {
 const errorCounter = new Counter('custom_errors');
 
 export const options = {
-  stages: STRESS_STAGES,
+  stages: getStages('stress'),
   thresholds: {
     // Stress test tem thresholds mais relaxados
     'http_req_duration': ['p(95)<2000'], // 2s
