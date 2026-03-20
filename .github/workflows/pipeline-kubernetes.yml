@@ -30,6 +30,8 @@ on:
 
 env:
   BASE_URL: http://localhost:3000
+  K6_WEB_DASHBOARD: true
+  K6_WEB_DASHBOARD_OPEN: false
 
 jobs:
   load-testing-kubernetes:
@@ -101,6 +103,69 @@ jobs:
           done
           curl -f http://localhost:3000 || { echo "ERRO: port-forward falhou"; exit 1; }
 
+      # ---- Coleta de Métricas em Tempo Real ----
+
+      - name: Iniciar coleta de métricas (background)
+        run: |
+          mkdir -p k6/results
+
+          # Cabeçalho do CSV
+          echo "timestamp,elapsed_sec,hpa_cpu_pct,hpa_mem_pct,current_replicas,desired_replicas,pod_count,total_cpu_millicores,total_mem_mib" \
+            > k6/results/cluster-metrics.csv
+
+          START_TIME=$(date +%s)
+
+          while true; do
+            NOW=$(date +%s)
+            ELAPSED=$((NOW - START_TIME))
+            TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+            # Extrair métricas do HPA via jsonpath (robusto, sem parsing de colunas)
+            HPA_CPU=$(kubectl get hpa serverest-hpa -n serverest \
+              -o jsonpath='{.status.currentMetrics[?(@.resource.name=="cpu")].resource.current.averageUtilization}' 2>/dev/null)
+            HPA_CPU=${HPA_CPU:-0}
+
+            HPA_MEM=$(kubectl get hpa serverest-hpa -n serverest \
+              -o jsonpath='{.status.currentMetrics[?(@.resource.name=="memory")].resource.current.averageUtilization}' 2>/dev/null)
+            HPA_MEM=${HPA_MEM:-0}
+
+            CURRENT_REPLICAS=$(kubectl get hpa serverest-hpa -n serverest \
+              -o jsonpath='{.status.currentReplicas}' 2>/dev/null)
+            CURRENT_REPLICAS=${CURRENT_REPLICAS:-0}
+
+            DESIRED_REPLICAS=$(kubectl get hpa serverest-hpa -n serverest \
+              -o jsonpath='{.status.desiredReplicas}' 2>/dev/null)
+            DESIRED_REPLICAS=${DESIRED_REPLICAS:-0}
+
+            # Contar pods running
+            POD_COUNT=$(kubectl get pods -n serverest --no-headers \
+              --field-selector=status.phase=Running 2>/dev/null | wc -l | tr -d ' ')
+
+            # Capturar CPU e memória total dos pods
+            TOP_OUTPUT=$(kubectl top pods -n serverest --no-headers 2>/dev/null || true)
+            if [ -n "$TOP_OUTPUT" ]; then
+              TOTAL_CPU=$(echo "$TOP_OUTPUT" | awk '{gsub(/m/,"",$2); sum+=$2} END {print sum+0}')
+              TOTAL_MEM=$(echo "$TOP_OUTPUT" | awk '{gsub(/Mi/,"",$3); sum+=$3} END {print sum+0}')
+            else
+              TOTAL_CPU=0; TOTAL_MEM=0
+            fi
+
+            echo "${TIMESTAMP},${ELAPSED},${HPA_CPU},${HPA_MEM},${CURRENT_REPLICAS},${DESIRED_REPLICAS},${POD_COUNT},${TOTAL_CPU},${TOTAL_MEM}" \
+              >> k6/results/cluster-metrics.csv
+
+            # Log por pod individual (para análise detalhada)
+            echo "--- ${TIMESTAMP} (${ELAPSED}s) ---" >> k6/results/pod-metrics-detail.log
+            kubectl top pods -n serverest 2>/dev/null >> k6/results/pod-metrics-detail.log || true
+            kubectl get hpa -n serverest 2>/dev/null >> k6/results/pod-metrics-detail.log || true
+            echo "" >> k6/results/pod-metrics-detail.log
+
+            sleep 15
+          done &
+
+          echo $! > /tmp/metrics-collector-pid
+          echo "Coleta de métricas iniciada (PID: $(cat /tmp/metrics-collector-pid))"
+          echo "Coletando a cada 15 segundos para k6/results/cluster-metrics.csv"
+
       # ---- Testes de Carga ----
 
       - name: Setup k6
@@ -108,31 +173,62 @@ jobs:
 
       - name: Health Check
         if: inputs.test_health
-        run: k6 run k6/scripts/00-health-check.js
+        run: K6_WEB_DASHBOARD_EXPORT=k6/results/health-check-dashboard.html k6 run k6/scripts/00-health-check.js
 
       - name: Smoke Test
         if: inputs.test_smoke
-        run: k6 run k6/scripts/01-smoke-test.js
+        run: K6_WEB_DASHBOARD_EXPORT=k6/results/smoke-test-dashboard.html k6 run k6/scripts/01-smoke-test.js
 
       - name: Load Test
         if: inputs.test_load
-        run: k6 run k6/scripts/02-load-test.js
+        run: K6_WEB_DASHBOARD_EXPORT=k6/results/load-test-dashboard.html k6 run k6/scripts/02-load-test.js
         continue-on-error: true
 
       - name: Stress Test
         if: inputs.test_stress
-        run: k6 run k6/scripts/03-stress-test.js
+        run: K6_WEB_DASHBOARD_EXPORT=k6/results/stress-test-dashboard.html k6 run k6/scripts/03-stress-test.js
         continue-on-error: true
 
       - name: Spike Test
         if: inputs.test_spike
-        run: k6 run k6/scripts/04-spike-test.js
+        run: K6_WEB_DASHBOARD_EXPORT=k6/results/spike-test-dashboard.html k6 run k6/scripts/04-spike-test.js
         continue-on-error: true
 
       - name: Soak Test
         if: inputs.test_soak
-        run: k6 run k6/scripts/05-soak-test.js
+        run: K6_WEB_DASHBOARD_EXPORT=k6/results/soak-test-dashboard.html k6 run k6/scripts/05-soak-test.js
         continue-on-error: true
+
+      # ---- Parar Coleta e Gerar Resumo ----
+
+      - name: Parar coleta de métricas
+        if: always()
+        run: |
+          if [ -f /tmp/metrics-collector-pid ]; then
+            kill "$(cat /tmp/metrics-collector-pid)" 2>/dev/null || true
+            echo "Coletor de métricas parado."
+          fi
+
+          echo ""
+          echo "=== Métricas Coletadas ==="
+          if [ -f k6/results/cluster-metrics.csv ]; then
+            LINES=$(wc -l < k6/results/cluster-metrics.csv | tr -d ' ')
+            echo "Total de amostras: $((LINES - 1))"
+            echo ""
+            echo "--- Primeiras 5 amostras ---"
+            head -6 k6/results/cluster-metrics.csv | column -t -s,
+            echo ""
+            echo "--- Últimas 5 amostras ---"
+            tail -5 k6/results/cluster-metrics.csv | column -t -s,
+            echo ""
+
+            # Resumo de scaling
+            echo "=== Histórico de Réplicas ==="
+            awk -F, 'NR>1 {printf "%s  réplicas=%s  desejado=%s  pods=%s  cpu=%sm  mem=%sMi\n", $1, $5, $6, $7, $8, $9}' \
+              k6/results/cluster-metrics.csv
+          else
+            echo "AVISO: Arquivo de métricas não encontrado"
+          fi
 
       # ---- Verificacao K8s ----
 
@@ -142,21 +238,36 @@ jobs:
           echo "=== HPA Status ==="
           kubectl get hpa -n serverest
           echo ""
+          echo "=== HPA Detalhado ==="
+          kubectl describe hpa serverest-hpa -n serverest
+          echo ""
           echo "=== Pods Status ==="
           kubectl get pods -n serverest -o wide
           echo ""
           echo "=== Pod Metrics ==="
-          kubectl top pods -n serverest || echo "Metrics nao disponiveis ainda"
+          kubectl top pods -n serverest || echo "Metrics não disponíveis"
           echo ""
           echo "=== Node Metrics ==="
-          kubectl top nodes || echo "Metrics nao disponiveis ainda"
+          kubectl top nodes || echo "Metrics não disponíveis"
           echo ""
-          echo "=== Eventos Recentes ==="
-          kubectl get events -n serverest --sort-by='.lastTimestamp' | tail -20
+          echo "=== Eventos de Scaling ==="
+          kubectl get events -n serverest --sort-by='.lastTimestamp' \
+            --field-selector reason=SuccessfulRescale 2>/dev/null || echo "Nenhum evento de scaling"
+          echo ""
+          echo "=== Todos os Eventos Recentes ==="
+          kubectl get events -n serverest --sort-by='.lastTimestamp' | tail -30
+
+      # ---- Dashboard Visual ----
+
+      - name: Gerar dashboard visual do cluster
+        if: always()
+        run: |
+          pip install --quiet plotly pandas kaleido 2>/dev/null || pip install --quiet plotly pandas
+          python3 k6/scripts/generate-dashboard.py k6/results/cluster-metrics.csv k6/results
 
       # ---- Relatorios ----
 
-      - name: Upload relatórios k6
+      - name: Upload relatórios e dashboards
         uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -164,6 +275,9 @@ jobs:
           path: |
             k6/results/*.json
             k6/results/*.html
+            k6/results/*.csv
+            k6/results/*.png
+            k6/results/*.log
           retention-days: 30
 
       - name: Resumo dos resultados
@@ -175,7 +289,7 @@ jobs:
           echo "**BASE_URL:** $BASE_URL" >> $GITHUB_STEP_SUMMARY
           echo "**HPA:** minReplicas=2, maxReplicas=4 (CI-optimized)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Testes executados" >> $GITHUB_STEP_SUMMARY
+          echo "### Testes Executados" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Teste | Selecionado |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|-------------|" >> $GITHUB_STEP_SUMMARY
@@ -186,7 +300,22 @@ jobs:
           echo "| Spike Test | ${{ inputs.test_spike }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Soak Test | ${{ inputs.test_soak }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Estado do Cluster" >> $GITHUB_STEP_SUMMARY
+
+          # Tabela de métricas de scaling
+          if [ -f k6/results/cluster-metrics.csv ]; then
+            echo "### Métricas de Scaling (a cada 15s)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Tempo (s) | CPU HPA (%) | Mem HPA (%) | Réplicas | Desejado | Pods | CPU Total (m) | Mem Total (Mi) |" >> $GITHUB_STEP_SUMMARY
+            echo "|-----------|-------------|-------------|----------|----------|------|---------------|----------------|" >> $GITHUB_STEP_SUMMARY
+
+            awk -F, 'NR>1 {
+              printf "| %s | %s | %s | %s | %s | %s | %s | %s |\n", $2, $3, $4, $5, $6, $7, $8, $9
+            }' k6/results/cluster-metrics.csv >> $GITHUB_STEP_SUMMARY
+
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "### Estado Final do Cluster" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           kubectl get hpa -n serverest 2>/dev/null >> $GITHUB_STEP_SUMMARY || true
@@ -194,6 +323,25 @@ jobs:
           kubectl get pods -n serverest -o wide 2>/dev/null >> $GITHUB_STEP_SUMMARY || true
           echo '```' >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Relatórios" >> $GITHUB_STEP_SUMMARY
+
+          # Eventos de scaling
+          SCALING_EVENTS=$(kubectl get events -n serverest \
+            --field-selector reason=SuccessfulRescale --no-headers 2>/dev/null || true)
+          if [ -n "$SCALING_EVENTS" ]; then
+            echo "### Eventos de Scaling" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "$SCALING_EVENTS" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### Eventos de Scaling" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "> Nenhum evento de scaling detectado. Execute com Stress Test ou Spike Test habilitados." >> $GITHUB_STEP_SUMMARY
+          fi
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Baixe os relatórios JSON e HTML na aba **Artifacts**." >> $GITHUB_STEP_SUMMARY
+          echo "### Dashboards Visuais" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Baixe os **dashboards interativos** na aba **Artifacts**:" >> $GITHUB_STEP_SUMMARY
+          echo "- \`*-dashboard.html\` — Dashboards k6 com gráficos de latência, throughput, VUs" >> $GITHUB_STEP_SUMMARY
+          echo "- \`cluster-scaling-dashboard.html\` — Dashboard de scaling com CPU, memória, réplicas" >> $GITHUB_STEP_SUMMARY
+          echo "- \`cluster-metrics.csv\` — Dados brutos para análise adicional" >> $GITHUB_STEP_SUMMARY
