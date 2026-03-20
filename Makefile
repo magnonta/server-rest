@@ -1,8 +1,8 @@
 # ============================================================================
 # DEVOPS COURSE - MAKEFILE COMPLETO
 # ============================================================================
-# Automação completa do ambiente de testes de carga e segurança
-# Curso: Pós-Graduação em QA - Testes de Carga e Segurança em CI/CD
+# Automação completa do ambiente de testes de carga
+# Curso: Pós-Graduação em QA - Testes de Carga em CI/CD
 #
 # Compatível com: Ubuntu, WSL2, macOS
 # 
@@ -40,7 +40,6 @@ SETUP_SCRIPTS := $(SCRIPTS_DIR)/setup
 K8S_SCRIPTS := $(SCRIPTS_DIR)/k8s
 UTILS_SCRIPTS := $(SCRIPTS_DIR)/utils
 LOAD_SCRIPTS := $(SCRIPTS_DIR)/load-testing
-SECURITY_SCRIPTS := $(SCRIPTS_DIR)/security
 
 # Configuração do Cluster kind
 KIND_CLUSTER_NAME ?= serverest-cluster
@@ -58,10 +57,6 @@ BASE_URL ?= http://localhost:30000
 
 # Configuração Docker (ServeRest original)
 NAME_IMAGE ?= paulogoncalvesbh/serverest
-
-# Configuração de Segurança
-TRIVY_VERSION ?= latest
-ZAP_VERSION ?= latest
 
 # Timeouts
 POD_READY_TIMEOUT ?= 120s
@@ -368,59 +363,6 @@ test-load-suite: ensure-environment
 		$(VERBOSE)
 
 # ============================================================================
-# TESTES DE SEGURANÇA
-# ============================================================================
-
-.PHONY: test-security test-trivy test-trivy-image test-trivy-k8s test-zap security-report
-
-## test-security: Todos os testes de segurança
-test-security: test-trivy test-zap
-	$(call log,$(GREEN)✅ Testes de segurança concluídos$(RESET))
-
-## test-trivy: Scans Trivy (imagem + K8s)
-test-trivy: test-trivy-image test-trivy-k8s
-
-## test-trivy-image: Scan de vulnerabilidades na imagem
-test-trivy-image:
-	$(call log,$(BOLD)Trivy Image Scan$(RESET))
-	$(Q)docker run --rm \
-		-v /var/run/docker.sock:/var/run/docker.sock \
-		aquasec/trivy:$(TRIVY_VERSION) image \
-		--severity HIGH,CRITICAL \
-		--format table \
-		$(NAME_IMAGE):latest
-
-## test-trivy-k8s: Scan de configurações Kubernetes
-test-trivy-k8s:
-	$(call log,$(BOLD)Trivy Kubernetes Scan$(RESET))
-	$(Q)docker run --rm \
-		-v $(PWD)/k8s:/k8s:ro \
-		aquasec/trivy:$(TRIVY_VERSION) config \
-		--severity HIGH,CRITICAL \
-		--format table \
-		/k8s
-
-## test-zap: OWASP ZAP baseline scan
-test-zap:
-	$(call log,$(BOLD)OWASP ZAP Baseline Scan$(RESET))
-	$(call log,$(YELLOW)Certifique-se de que $(BASE_URL) está acessível$(RESET))
-	$(Q)docker run --rm \
-		--network host \
-		owasp/zap2docker-stable:$(ZAP_VERSION) \
-		zap-baseline.py \
-		-t $(BASE_URL) \
-		-r /zap/wrk/zap-report.html
-
-## security-report: Relatório consolidado
-security-report:
-	$(call log,$(BOLD)Gerando relatório de segurança$(RESET))
-	$(Q)bash $(SECURITY_SCRIPTS)/run-all-scans.sh \
-		$(NAME_IMAGE) \
-		$(BASE_URL) \
-		$(VERBOSE)
-	$(call log,$(GREEN)✅ Relatórios em: security/reports/$(RESET))
-
-# ============================================================================
 # MONITORAMENTO E DEBUG
 # ============================================================================
 
@@ -453,12 +395,12 @@ top:
 ## watch-hpa: Observa HPA em tempo real
 watch-hpa:
 	$(call log,$(BOLD)Observando HPA (CTRL+C para parar)$(RESET))
-	$(Q)watch -n 2 "kubectl get hpa -n $(K8S_NAMESPACE)"
+	$(Q)while true; do clear; date; echo ""; kubectl get hpa -n $(K8S_NAMESPACE); sleep 2; done
 
 ## watch-pods: Observa pods em tempo real
 watch-pods:
 	$(call log,$(BOLD)Observando Pods (CTRL+C para parar)$(RESET))
-	$(Q)watch -n 2 "kubectl get pods -n $(K8S_NAMESPACE) -o wide"
+	$(Q)while true; do clear; date; echo ""; kubectl get pods -n $(K8S_NAMESPACE) -o wide; sleep 2; done
 
 ## events: Lista eventos do cluster
 events:
@@ -475,7 +417,7 @@ debug-shell:
 # BOOTSTRAP E WORKFLOWS COMPLETOS
 # ============================================================================
 
-.PHONY: bootstrap setup ensure-environment lab-aula-01 lab-aula-02 demo status clean clean-all reset
+.PHONY: bootstrap setup ensure-environment lab-aula-01 demo status clean clean-all reset
 
 ## ensure-environment: Garante que o ambiente está pronto (cria se necessário)
 ensure-environment: check-prereqs
@@ -548,22 +490,6 @@ lab-aula-01: ensure-environment
 	$(call log,     - make test-stress)
 	$(call log,     - make test-spike)
 	$(call log,     - make test-soak)
-	$(Q)echo ""
-
-## lab-aula-02: Workflow completo Aula 02 (Segurança)
-lab-aula-02: ensure-environment
-	$(call log,$(BOLD)========================================$(RESET))
-	$(call log,$(BOLD)  AULA 02: TESTES DE SEGURANÇA$(RESET))
-	$(call log,$(BOLD)========================================$(RESET))
-	$(Q)echo ""
-	$(Q)$(MAKE) test-security VERBOSE=$(VERBOSE)
-	$(Q)echo ""
-	$(call log,$(BOLD)========================================$(RESET))
-	$(call log,$(GREEN)✅ LAB AULA 02 CONCLUÍDO! ✅$(RESET))
-	$(call log,$(BOLD)========================================$(RESET))
-	$(Q)echo ""
-	$(call log,$(BOLD)Relatórios gerados em:$(RESET))
-	$(call log,  security/reports/)
 	$(Q)echo ""
 
 ## demo: Demonstração rápida (5 min)
@@ -684,7 +610,6 @@ help:
 	$(Q)echo "$(BOLD)COMANDOS PRINCIPAIS:$(RESET)"
 	$(Q)echo "  $(GREEN)make bootstrap$(RESET)        Cria ambiente do ZERO"
 	$(Q)echo "  $(GREEN)make lab-aula-01$(RESET)      Workflow Aula 01 (auto-prepara ambiente)"
-	$(Q)echo "  $(GREEN)make lab-aula-02$(RESET)      Workflow Aula 02 (auto-prepara ambiente)"
 	$(Q)echo "  $(GREEN)make status$(RESET)           Status geral do ambiente"
 	$(Q)echo "  $(GREEN)make clean-all$(RESET)        Limpeza completa"
 	$(Q)echo ""
@@ -700,7 +625,7 @@ help:
 	$(Q)echo "  $(YELLOW)make help-prereqs$(RESET)    Pré-requisitos e instalação"
 	$(Q)echo "  $(YELLOW)make help-cluster$(RESET)    Cluster Kubernetes"
 	$(Q)echo "  $(YELLOW)make help-deploy$(RESET)     Deploy da aplicação"
-	$(Q)echo "  $(YELLOW)make help-tests$(RESET)      Testes (carga e segurança)"
+	$(Q)echo "  $(YELLOW)make help-tests$(RESET)      Testes de carga"
 	$(Q)echo "  $(YELLOW)make help-debug$(RESET)      Debug e monitoramento"
 	$(Q)echo ""
 	$(Q)echo "$(BOLD)CUSTOMIZAÇÃO:$(RESET)"
@@ -768,11 +693,6 @@ help-tests:
 	$(Q)echo "  make test-soak           Soak test (30 minutos)"
 	$(Q)echo "  make test-load-all       Todos exceto soak"
 	$(Q)echo "  make test-load-suite     Suite completa com relatório"
-	$(Q)echo ""
-	$(Q)echo "$(BOLD)SEGURANÇA$(RESET)"
-	$(Q)echo "  make test-security    Todos os scans"
-	$(Q)echo "  make test-trivy       Trivy (imagem + K8s)"
-	$(Q)echo "  make test-zap         OWASP ZAP"
 
 ## help-debug: Ajuda sobre debug
 help-debug:

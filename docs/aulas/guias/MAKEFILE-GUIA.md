@@ -16,7 +16,7 @@
 
 ## 🎯 Introdução
 
-Este Makefile foi criado para **automatizar todo o processo de setup, deploy e testes** do ambiente DevOps usado nas aulas de Testes de Carga e Segurança em CI/CD.
+Este Makefile foi criado para **automatizar todo o processo de setup, deploy e testes** do ambiente DevOps usado nas aulas de Testes de Carga em CI/CD.
 
 ### O que o Makefile faz?
 
@@ -24,7 +24,7 @@ Este Makefile foi criado para **automatizar todo o processo de setup, deploy e t
 - 🚀 **Cria** um cluster Kubernetes local com kind
 - 📦 **Instala** o Metrics Server para monitoramento
 - 🔄 **Faz deploy** da aplicação ServeRest no cluster
-- 🧪 **Executa** testes de carga (k6) e segurança (Trivy, ZAP)
+- 🧪 **Executa** testes de carga (k6)
 - 🔍 **Monitora** pods, HPA, logs e recursos
 - 🧹 **Limpa** o ambiente quando necessário
 
@@ -263,16 +263,6 @@ make test-soak        # Teste de imersão (5 min, carga constante)
 make test-load-all    # Executa TODOS os testes em sequência
 ```
 
-### Testes de Segurança
-
-```bash
-make test-trivy       # Trivy completo (imagem + k8s)
-make test-trivy-image # Scan de imagem Docker
-make test-trivy-k8s   # Scan de manifests Kubernetes
-make test-zap         # OWASP ZAP scan (requer API rodando)
-make test-security    # Todos os testes de segurança
-```
-
 ### Monitoramento e Debug
 
 ```bash
@@ -375,74 +365,6 @@ make logs-follow
 make status
 
 # Opcional: Limpar ambiente
-make clean-all
-```
-
----
-
-### 🔒 Aula 02: Testes de Segurança em CI/CD
-
-#### Setup Inicial
-
-```bash
-# Se já fez na Aula 01, pode pular
-make bootstrap
-make status
-```
-
-#### Workflow Completo da Aula 02
-
-```bash
-# Executa TUDO: bootstrap + todos os testes de segurança
-make lab-aula-02
-```
-
-**Este comando executa:**
-1. ✅ Bootstrap do ambiente
-2. 🔍 Trivy scan (imagem Docker)
-3. 🔍 Trivy scan (manifests Kubernetes)
-4. 🔍 OWASP ZAP scan
-
-**Tempo estimado:** 5-10 minutos
-
-#### Executar Testes Individualmente
-
-```bash
-# Scan de vulnerabilidades na imagem
-make test-trivy-image
-
-# Scan de configurações Kubernetes
-make test-trivy-k8s
-
-# Scan de vulnerabilidades web (ZAP)
-make test-zap
-
-# Executar todos os testes de segurança
-make test-security
-```
-
-#### Análise de Resultados
-
-Os resultados dos scans são salvos em:
-- `tmp/trivy-image-report.txt` - Vulnerabilidades da imagem
-- `tmp/trivy-k8s-report.txt` - Issues de configuração K8s
-- (ZAP gera output no console)
-
-```bash
-# Ver relatório do Trivy (imagem)
-cat tmp/trivy-image-report.txt
-
-# Ver relatório do Trivy (K8s)
-cat tmp/trivy-k8s-report.txt
-```
-
-#### Ao Final da Aula
-
-```bash
-# Ver status final
-make status
-
-# Limpar ambiente
 make clean-all
 ```
 
@@ -876,37 +798,6 @@ make test-load-all
 
 ---
 
-### Testes de Segurança
-
-| Comando | Descrição | Ferramenta |
-|---------|-----------|------------|
-| `make test-trivy` | Scan completo (imagem + K8s) | Trivy |
-| `make test-trivy-image` | Scan de vulnerabilidades na imagem Docker | Trivy |
-| `make test-trivy-k8s` | Scan de configurações Kubernetes | Trivy |
-| `make test-zap` | Scan de vulnerabilidades web | OWASP ZAP |
-| `make test-security` | Executa TODOS os testes de segurança | Trivy + ZAP |
-
-**Exemplos:**
-```bash
-# Scan da imagem Docker
-make test-trivy-image
-
-# Scan dos manifests Kubernetes
-make test-trivy-k8s
-
-# Scan de segurança web
-make test-zap
-
-# Executar todos os testes de segurança
-make test-security
-```
-
-**Relatórios gerados:**
-- `tmp/trivy-image-report.txt` - Vulnerabilidades da imagem
-- `tmp/trivy-k8s-report.txt` - Issues de configuração K8s
-
----
-
 ### Monitoramento e Debug
 
 | Comando | Descrição |
@@ -957,7 +848,6 @@ make debug-shell
 |---------|-----------|----------------|
 | `make bootstrap` | Setup completo: cluster + metrics + deploy + port-forward | 2-3 min |
 | `make lab-aula-01` | Workflow Aula 01: bootstrap + todos testes de carga | 10-15 min |
-| `make lab-aula-02` | Workflow Aula 02: bootstrap + todos testes de segurança | 5-10 min |
 | `make demo` | Demo rápido: bootstrap + smoke test | 3-4 min |
 | `make status` | Status completo do ambiente | 5s |
 | `make clean` | Remove deploy e para port-forward | 10s |
@@ -971,9 +861,6 @@ make bootstrap
 
 # Workflow da Aula 01 (completo)
 make lab-aula-01
-
-# Workflow da Aula 02 (completo)
-make lab-aula-02
 
 # Ver status de tudo
 make status
@@ -1093,10 +980,9 @@ make bootstrap
 
 ### Durante a Aula
 
-1. **Use os workflows completos:**
+1. **Use o workflow completo:**
    ```bash
-   make lab-aula-01  # Aula 01
-   make lab-aula-02  # Aula 02
+   make lab-aula-01  # Aula 01: Testes de Carga
    ```
 
 2. **Monitore em tempo real:**
