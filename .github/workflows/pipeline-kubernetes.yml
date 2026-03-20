@@ -29,7 +29,7 @@ on:
         default: false
 
 env:
-  BASE_URL: http://localhost:3000
+  BASE_URL: http://localhost:30000
   K6_WEB_DASHBOARD: true
   K6_WEB_DASHBOARD_OPEN: false
   K6_CI: true
@@ -90,19 +90,25 @@ jobs:
           echo "=== HPA ==="
           kubectl get hpa -n serverest
 
-      - name: Port forward ServeRest
+      - name: Configurar acesso via NodePort
         run: |
-          kubectl port-forward -n serverest svc/serverest 3000:3000 &
-          echo "Aguardando port-forward..."
+          # NodePort 30000 mapeado via extraPortMappings do kind
+          # Mais robusto que port-forward — não morre sob carga pesada
+          export BASE_URL="http://localhost:30000"
+          echo "BASE_URL=http://localhost:30000" >> $GITHUB_ENV
+          echo "BASE_URL definida: ${BASE_URL}"
+
+          # Verificar conectividade
+          echo "Verificando acesso ao ServeRest via NodePort..."
           for i in $(seq 1 20); do
-            if curl -sf http://localhost:3000 > /dev/null 2>&1; then
-              echo "ServeRest acessivel via port-forward!"
+            if curl -sf http://localhost:30000 > /dev/null 2>&1; then
+              echo "ServeRest acessível via NodePort!"
               break
             fi
             echo "Tentativa $i/20..."
             sleep 3
           done
-          curl -f http://localhost:3000 || { echo "ERRO: port-forward falhou"; exit 1; }
+          curl -f http://localhost:30000 || { echo "ERRO: ServeRest não acessível via NodePort"; exit 1; }
 
       # ---- Coleta de Métricas em Tempo Real ----
 

@@ -20,7 +20,7 @@ export default function () {
   
   check(response, {
     'status é 200': (r) => r.status === 200,
-    'resposta contém ServeRest': (r) => r.body.includes('ServeRest'),
+    'resposta contém ServeRest': (r) => r.status !== 0 && r.body && r.body.includes('ServeRest'),
   });
   
   sleep(1);

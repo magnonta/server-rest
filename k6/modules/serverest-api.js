@@ -18,7 +18,7 @@ export function criarUsuario(baseUrl, userData) {
   
   check(response, {
     'criar usuário: status 201': (r) => r.status === 201,
-    'criar usuário: tem _id': (r) => r.json('_id') !== undefined,
+    'criar usuário: tem _id': (r) => r.status !== 0 && r.json('_id') !== undefined,
   });
   
   return response;
@@ -40,10 +40,10 @@ export function fazerLogin(baseUrl, email, password) {
   
   check(response, {
     'login: status 200': (r) => r.status === 200,
-    'login: tem authorization': (r) => r.json('authorization') !== undefined,
+    'login: tem authorization': (r) => r.status !== 0 && r.json('authorization') !== undefined,
   });
   
-  return response.json('authorization');
+  return response.status !== 0 ? response.json('authorization') : '';
 }
 
 /**
@@ -56,7 +56,7 @@ export function listarUsuarios(baseUrl) {
   
   check(response, {
     'listar usuários: status 200': (r) => r.status === 200,
-    'listar usuários: tem array': (r) => Array.isArray(r.json('usuarios')),
+    'listar usuários: tem array': (r) => r.status !== 0 && Array.isArray(r.json('usuarios')),
   });
   
   return response;
@@ -99,7 +99,7 @@ export function criarProduto(baseUrl, token, productData) {
   
   check(response, {
     'criar produto: status 201': (r) => r.status === 201,
-    'criar produto: tem _id': (r) => r.json('_id') !== undefined,
+    'criar produto: tem _id': (r) => r.status !== 0 && r.json('_id') !== undefined,
   });
   
   return response;
@@ -115,7 +115,7 @@ export function listarProdutos(baseUrl) {
   
   check(response, {
     'listar produtos: status 200': (r) => r.status === 200,
-    'listar produtos: tem array': (r) => Array.isArray(r.json('produtos')),
+    'listar produtos: tem array': (r) => r.status !== 0 && Array.isArray(r.json('produtos')),
   });
   
   return response;

@@ -48,7 +48,7 @@ export default function () {
     sleep(0.2);
     
     // Se temos produtos, buscar detalhes de um
-    const products = productsResponse.json('produtos');
+    const products = productsResponse.status === 200 ? productsResponse.json('produtos') : [];
     if (products && products.length > 0) {
       const randomProduct = products[Math.floor(Math.random() * products.length)];
       const productResponse = buscarProduto(BASE_URL, randomProduct._id);

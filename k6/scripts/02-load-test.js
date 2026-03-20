@@ -49,7 +49,7 @@ export default function () {
     };
     
     const userResponse = criarUsuario(BASE_URL, userData);
-    userId = userResponse.json('_id');
+    userId = userResponse.status === 201 ? userResponse.json('_id') : undefined;
     
     thinkTime(1, 2);
     
@@ -67,7 +67,7 @@ export default function () {
   group('02 - Navegação de Produtos', () => {
     // Listar produtos
     const productsResponse = listarProdutos(BASE_URL);
-    const products = productsResponse.json('produtos');
+    const products = productsResponse.status === 200 ? productsResponse.json('produtos') : [];
     
     thinkTime(1, 2);
     
@@ -90,11 +90,11 @@ export default function () {
     };
     
     const productResponse = criarProduto(BASE_URL, token, productData);
-    productId = productResponse.json('_id');
+    productId = productResponse.status === 201 ? productResponse.json('_id') : undefined;
     
     check(productResponse, {
       'produto criado com sucesso': (r) => r.status === 201,
-      'produto tem ID': (r) => r.json('_id') !== undefined,
+      'produto tem ID': (r) => r.status !== 0 && r.json('_id') !== undefined,
     });
   });
 
