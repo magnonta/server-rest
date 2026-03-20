@@ -55,6 +55,11 @@ METRICS_SERVER_MANIFEST ?= k8s/kind/metrics-server.yaml
 K6_SCRIPTS_DIR ?= k6/scripts
 BASE_URL ?= http://localhost:30000
 
+# k6 Web Dashboard
+K6_DASHBOARD ?= false
+K6_DASHBOARD_OPEN ?= false
+K6_RESULTS_DIR ?= k6/results
+
 # Configuração Docker (ServeRest original)
 NAME_IMAGE ?= paulogoncalvesbh/serverest
 
@@ -81,6 +86,15 @@ ifeq ($(VERBOSE),1)
 else
     Q := @
     QUIET := --quiet
+endif
+
+# Configuração do k6 Web Dashboard (variáveis de ambiente para k6)
+ifeq ($(K6_DASHBOARD),true)
+    K6_DASHBOARD_ENV := K6_WEB_DASHBOARD=true K6_WEB_DASHBOARD_OPEN=$(K6_DASHBOARD_OPEN)
+    K6_DASHBOARD_EXPORT = K6_WEB_DASHBOARD_EXPORT=
+else
+    K6_DASHBOARD_ENV :=
+    K6_DASHBOARD_EXPORT :=
 endif
 
 # ============================================================================
@@ -315,44 +329,62 @@ api-test:
 ## test-health: Health check básico
 test-health: ensure-environment
 	$(call log,$(BOLD)Health Check$(RESET))
-	$(Q)BASE_URL=$(BASE_URL) k6 run $(K6_SCRIPTS_DIR)/00-health-check.js \
+	$(Q)mkdir -p $(K6_RESULTS_DIR)
+	$(Q)$(K6_DASHBOARD_ENV) $(K6_DASHBOARD_EXPORT)$(K6_RESULTS_DIR)/health-check-dashboard.html \
+		BASE_URL=$(BASE_URL) k6 run $(K6_SCRIPTS_DIR)/00-health-check.js \
 		$(if $(filter 0,$(VERBOSE)),--quiet)
 
 ## test-smoke: Smoke test (1 VU)
 test-smoke: ensure-environment
 	$(call log,$(BOLD)Smoke Test$(RESET))
-	$(Q)BASE_URL=$(BASE_URL) k6 run $(K6_SCRIPTS_DIR)/01-smoke-test.js \
+	$(Q)mkdir -p $(K6_RESULTS_DIR)
+	$(Q)$(K6_DASHBOARD_ENV) $(K6_DASHBOARD_EXPORT)$(K6_RESULTS_DIR)/smoke-test-dashboard.html \
+		BASE_URL=$(BASE_URL) k6 run $(K6_SCRIPTS_DIR)/01-smoke-test.js \
 		$(if $(filter 0,$(VERBOSE)),--quiet)
 
 ## test-load-progressive: Load test (10-20 VUs)
 test-load-progressive: ensure-environment
 	$(call log,$(BOLD)Load Test Progressivo$(RESET))
-	$(Q)BASE_URL=$(BASE_URL) k6 run $(K6_SCRIPTS_DIR)/02-load-test.js
+	$(Q)mkdir -p $(K6_RESULTS_DIR)
+	$(Q)$(K6_DASHBOARD_ENV) $(K6_DASHBOARD_EXPORT)$(K6_RESULTS_DIR)/load-test-dashboard.html \
+		BASE_URL=$(BASE_URL) k6 run $(K6_SCRIPTS_DIR)/02-load-test.js
 
 ## test-stress: Stress test (até 300 VUs)
 test-stress: ensure-environment
 	$(call log,$(YELLOW)⚠️  Stress Test - Alta carga no sistema$(RESET))
-	$(Q)BASE_URL=$(BASE_URL) k6 run $(K6_SCRIPTS_DIR)/03-stress-test.js
+	$(Q)mkdir -p $(K6_RESULTS_DIR)
+	$(Q)$(K6_DASHBOARD_ENV) $(K6_DASHBOARD_EXPORT)$(K6_RESULTS_DIR)/stress-test-dashboard.html \
+		BASE_URL=$(BASE_URL) k6 run $(K6_SCRIPTS_DIR)/03-stress-test.js
 
 ## test-spike: Spike test (picos de carga)
 test-spike: ensure-environment
 	$(call log,$(BOLD)Spike Test$(RESET))
-	$(Q)BASE_URL=$(BASE_URL) k6 run $(K6_SCRIPTS_DIR)/04-spike-test.js
+	$(Q)mkdir -p $(K6_RESULTS_DIR)
+	$(Q)$(K6_DASHBOARD_ENV) $(K6_DASHBOARD_EXPORT)$(K6_RESULTS_DIR)/spike-test-dashboard.html \
+		BASE_URL=$(BASE_URL) k6 run $(K6_SCRIPTS_DIR)/04-spike-test.js
 
 ## test-soak: Soak test (30 minutos)
 test-soak: ensure-environment
 	$(call log,$(YELLOW)⚠️  Soak Test - Duração: 30 minutos$(RESET))
 	$(call log,$(YELLOW)Pressione CTRL+C para cancelar$(RESET))
-	$(Q)BASE_URL=$(BASE_URL) k6 run $(K6_SCRIPTS_DIR)/05-soak-test.js
+	$(Q)mkdir -p $(K6_RESULTS_DIR)
+	$(Q)$(K6_DASHBOARD_ENV) $(K6_DASHBOARD_EXPORT)$(K6_RESULTS_DIR)/soak-test-dashboard.html \
+		BASE_URL=$(BASE_URL) k6 run $(K6_SCRIPTS_DIR)/05-soak-test.js
 
 ## test-load-all: Todos os testes (exceto soak)
 test-load-all: test-health test-smoke test-load-progressive test-stress test-spike
 	$(call log,$(GREEN)✅ Suite de testes de carga concluída$(RESET))
 	$(call log,$(YELLOW)Soak test (30min) não incluído$(RESET))
+ifeq ($(K6_DASHBOARD),true)
+	$(call log,$(CYAN)📊 Dashboards HTML gerados em: $(K6_RESULTS_DIR)/$(RESET))
+endif
 
 ## test-load: Testes rápidos (health + smoke + load)
 test-load: test-health test-smoke test-load-progressive
 	$(call log,$(GREEN)✅ Testes rápidos concluídos$(RESET))
+ifeq ($(K6_DASHBOARD),true)
+	$(call log,$(CYAN)📊 Dashboards HTML gerados em: $(K6_RESULTS_DIR)/$(RESET))
+endif
 
 ## test-load-suite: Executa suite via script externo (com relatório)
 test-load-suite: ensure-environment
@@ -693,6 +725,16 @@ help-tests:
 	$(Q)echo "  make test-soak           Soak test (30 minutos)"
 	$(Q)echo "  make test-load-all       Todos exceto soak"
 	$(Q)echo "  make test-load-suite     Suite completa com relatório"
+	$(Q)echo ""
+	$(Q)echo "$(BOLD)DASHBOARDS K6:$(RESET)"
+	$(Q)echo "  Ativar:   make test-smoke K6_DASHBOARD=true"
+	$(Q)echo "  Desativar: make test-smoke K6_DASHBOARD=false"
+	$(Q)echo "  Abrir no navegador durante teste: K6_DASHBOARD_OPEN=true"
+	$(Q)echo "  Dashboards HTML salvos em: $(K6_RESULTS_DIR)/"
+	$(Q)echo ""
+	$(Q)echo "  Configurar no $(BOLD).env.make$(RESET) para ativar permanentemente:"
+	$(Q)echo "    K6_DASHBOARD=true"
+	$(Q)echo "    K6_DASHBOARD_OPEN=false"
 
 ## help-debug: Ajuda sobre debug
 help-debug:

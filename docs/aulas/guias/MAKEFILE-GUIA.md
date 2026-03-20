@@ -178,6 +178,10 @@ BASE_URL=http://localhost:30000
 POD_READY_TIMEOUT=120
 METRICS_WAIT_TIME=30
 
+# k6 Web Dashboard (dashboards HTML interativos)
+K6_DASHBOARD=true        # gera dashboards HTML em k6/results/
+K6_DASHBOARD_OPEN=false  # abre navegador durante execução
+
 # Modo verbose (0 ou 1)
 VERBOSE=0
 ```
@@ -400,6 +404,52 @@ Para ver todos os comandos executados:
 make bootstrap VERBOSE=1
 make test-load VERBOSE=1
 ```
+
+### k6 Web Dashboard
+
+Os testes de carga podem gerar **dashboards HTML interativos** usando o k6 Web Dashboard nativo.
+
+#### Ativar Dashboards
+
+**Opção 1 — Via `.env.make` (permanente):**
+```bash
+K6_DASHBOARD=true
+K6_DASHBOARD_OPEN=false
+```
+
+**Opção 2 — Via linha de comando (pontual):**
+```bash
+make test-smoke K6_DASHBOARD=true
+make test-load-all K6_DASHBOARD=true
+```
+
+#### Abrir Dashboard em Tempo Real
+
+Para acompanhar o teste ao vivo no navegador (http://localhost:5665):
+```bash
+make test-stress K6_DASHBOARD=true K6_DASHBOARD_OPEN=true
+```
+
+#### Onde ficam os dashboards?
+
+Os dashboards HTML são salvos em `k6/results/`:
+```
+k6/results/
+├── health-check-dashboard.html
+├── smoke-test-dashboard.html
+├── load-test-dashboard.html
+├── stress-test-dashboard.html
+├── spike-test-dashboard.html
+└── soak-test-dashboard.html
+```
+
+Abra qualquer arquivo `.html` no navegador para visualizar:
+```bash
+open k6/results/smoke-test-dashboard.html       # macOS
+xdg-open k6/results/smoke-test-dashboard.html   # Linux
+```
+
+> **Nota:** Os arquivos em `k6/results/` são ignorados pelo git (`.gitignore`). Eles são gerados localmente e não devem ser commitados.
 
 ### Ajustar Recursos do Cluster
 
