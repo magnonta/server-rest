@@ -1,0 +1,30 @@
+# ============================================================================
+# Forçar line endings Unix (LF) em arquivos que rodam em shell
+# Evita erro '$\r': command not found' no WSL/Linux
+# ============================================================================
+
+# Shell scripts — SEMPRE LF
+*.sh text eol=lf
+
+# Makefiles — SEMPRE LF
+Makefile text eol=lf
+*.mk text eol=lf
+
+# Configurações de ambiente — SEMPRE LF
+.env.make.example text eol=lf
+
+# YAML (workflows GitHub Actions, K8s manifests) — SEMPRE LF
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# Python scripts — SEMPRE LF
+*.py text eol=lf
+
+# JavaScript (k6 scripts) — auto (não precisa forçar LF)
+*.js text
+
+# Markdown — auto
+*.md text
+
+# JSON — auto
+*.json text
