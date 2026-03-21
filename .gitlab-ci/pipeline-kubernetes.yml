@@ -1,0 +1,465 @@
+# ============================================================================
+# Pipeline - Kubernetes (kind) para GitLab CI
+# ============================================================================
+# Equivalente ao pipeline GitHub Actions: .github/workflows/pipeline-kubernetes.yml
+#
+# Executa testes de carga com k6 em cluster Kubernetes local (kind).
+# Coleta métricas de scaling (HPA) e gera dashboards visuais.
+#
+# INCLUSÃO: Adicione no .gitlab-ci.yml raiz:
+#   include:
+#     - local: '.gitlab-ci/pipeline-kubernetes.yml'
+#
+# PRÉ-REQUISITOS DO RUNNER:
+#   - Executor shell OU Docker privilegiado com socket montado
+#   - Docker deve estar disponível para o kind criar containers
+#   - Tag 'privileged' configurada no runner
+#
+# USO: Executar manualmente via "Run pipeline" no GitLab.
+#      Configure as variáveis TEST_* para selecionar os testes.
+# ============================================================================
+
+workflow:
+  rules:
+    - when: manual
+      allow_failure: true
+
+stages:
+  - load-testing
+
+variables:
+  # Variáveis de ambiente para k6
+  BASE_URL: "http://localhost:30000"
+  K6_WEB_DASHBOARD: "true"
+  K6_WEB_DASHBOARD_OPEN: "false"
+  K6_CI: "true"
+
+  # Seleção de testes (sobrescreva ao executar a pipeline manualmente)
+  TEST_HEALTH:
+    value: "true"
+    description: "Executar Health Check"
+  TEST_SMOKE:
+    value: "true"
+    description: "Executar Smoke Test"
+  TEST_LOAD:
+    value: "true"
+    description: "Executar Load Test"
+  TEST_STRESS:
+    value: "false"
+    description: "Executar Stress Test"
+  TEST_SPIKE:
+    value: "false"
+    description: "Executar Spike Test"
+  TEST_SOAK:
+    value: "false"
+    description: "Executar Soak Test (40 min)"
+
+load-testing-kubernetes:
+  stage: load-testing
+  image: ubuntu:22.04
+  tags:
+    - privileged
+  timeout: 2h
+
+  before_script:
+    # ---- Instalar dependências do sistema ----
+    - export DEBIAN_FRONTEND=noninteractive
+    - apt-get update -qq
+    - apt-get install -y -qq --no-install-recommends ca-certificates curl python3 python3-pip tar gzip jq procps
+    - update-ca-certificates
+
+    # ---- Verificar acesso ao Docker ----
+    - |
+      if ! command -v docker >/dev/null 2>&1; then
+        echo "ERRO: Docker não encontrado no runner."
+        echo "Este job requer executor shell ou runner privilegiado com acesso ao Docker."
+        exit 1
+      fi
+      docker version --format 'Docker {{.Server.Version}}' || { echo "ERRO: Docker não acessível"; exit 1; }
+
+    # ---- Instalar kubectl ----
+    - |
+      echo "=== Instalando kubectl ==="
+      KUBECTL_VERSION="$(curl -L -s https://dl.k8s.io/release/stable.txt)"
+      curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+      chmod +x kubectl
+      mv kubectl /usr/local/bin/
+      kubectl version --client=true
+
+    # ---- Instalar kind v0.31.0 ----
+    - |
+      echo "=== Instalando kind v0.31.0 ==="
+      curl -Lo kind https://kind.sigs.k8s.io/dl/v0.31.0/kind-linux-amd64
+      chmod +x kind
+      mv kind /usr/local/bin/
+      kind --version
+
+    # ---- Instalar k6 v1.6.1 ----
+    - |
+      echo "=== Instalando k6 v1.6.1 ==="
+      curl -LO https://github.com/grafana/k6/releases/download/v1.6.1/k6-v1.6.1-linux-amd64.tar.gz
+      tar xzf k6-v1.6.1-linux-amd64.tar.gz
+      mv k6-v1.6.1-linux-amd64/k6 /usr/local/bin/
+      rm -rf k6-v1.6.1-linux-amd64 k6-v1.6.1-linux-amd64.tar.gz
+      k6 version
+
+  script:
+    - |
+      set -euo pipefail
+
+      mkdir -p k6/results
+
+      # Variáveis para rastrear exit codes dos testes
+      HEALTH_EXIT=0
+      SMOKE_EXIT=0
+      LOAD_EXIT=0
+      STRESS_EXIT=0
+      SPIKE_EXIT=0
+      SOAK_EXIT=0
+
+      # ================================================================
+      # Função de cleanup — roda via trap EXIT (equivalente a always())
+      # ================================================================
+      cleanup() {
+        set +e
+
+        echo ""
+        echo "============================================"
+        echo "  Encerrando coleta de métricas"
+        echo "============================================"
+        if [ -f /tmp/metrics-collector-pid ]; then
+          kill "$(cat /tmp/metrics-collector-pid)" 2>/dev/null || true
+          echo "Coletor de métricas parado."
+        fi
+
+        echo ""
+        echo "=== Métricas Coletadas ==="
+        if [ -f k6/results/cluster-metrics.csv ]; then
+          LINES="$(wc -l < k6/results/cluster-metrics.csv | tr -d ' ')"
+          SAMPLES=$((LINES > 0 ? LINES - 1 : 0))
+          echo "Total de amostras: ${SAMPLES}"
+          echo ""
+          echo "--- Primeiras 5 amostras ---"
+          head -6 k6/results/cluster-metrics.csv | column -t -s, 2>/dev/null || head -6 k6/results/cluster-metrics.csv
+          echo ""
+          echo "--- Últimas 5 amostras ---"
+          tail -5 k6/results/cluster-metrics.csv | column -t -s, 2>/dev/null || tail -5 k6/results/cluster-metrics.csv
+          echo ""
+          echo "=== Histórico de Réplicas ==="
+          awk -F, 'NR>1 {printf "%s  réplicas=%s  desejado=%s  pods=%s  cpu=%sm  mem=%sMi\n", $1, $5, $6, $7, $8, $9}' \
+            k6/results/cluster-metrics.csv || true
+        else
+          echo "AVISO: Arquivo de métricas não encontrado"
+        fi
+
+        echo ""
+        echo "============================================"
+        echo "  Estado do cluster pós-testes"
+        echo "============================================"
+        echo "=== HPA Status ==="
+        kubectl get hpa -n serverest || true
+        echo ""
+        echo "=== HPA Detalhado ==="
+        kubectl describe hpa serverest-hpa -n serverest || true
+        echo ""
+        echo "=== Pods Status ==="
+        kubectl get pods -n serverest -o wide || true
+        echo ""
+        echo "=== Pod Metrics ==="
+        kubectl top pods -n serverest || echo "Métricas não disponíveis"
+        echo ""
+        echo "=== Node Metrics ==="
+        kubectl top nodes || echo "Métricas não disponíveis"
+        echo ""
+        echo "=== Eventos de Scaling ==="
+        kubectl get events -n serverest --sort-by='.lastTimestamp' \
+          --field-selector reason=SuccessfulRescale 2>/dev/null || echo "Nenhum evento de scaling"
+        echo ""
+        echo "=== Todos os Eventos Recentes ==="
+        kubectl get events -n serverest --sort-by='.lastTimestamp' 2>/dev/null | tail -30 || true
+
+        echo ""
+        echo "============================================"
+        echo "  Gerando dashboard visual do cluster"
+        echo "============================================"
+        pip3 install --quiet plotly pandas kaleido 2>/dev/null || pip3 install --quiet plotly pandas || true
+        python3 k6/scripts/generate-dashboard.py k6/results/cluster-metrics.csv k6/results || true
+
+        echo ""
+        echo "============================================"
+        echo "  Gerando resumo da pipeline"
+        echo "============================================"
+        {
+          echo "## Resultados - Load Testing (Kubernetes)"
+          echo ""
+          echo "**Pipeline:** GitLab CI - Kubernetes (kind)"
+          echo "**Modo:** kind cluster (single-node CI)"
+          echo "**BASE_URL:** http://localhost:30000"
+          echo "**HPA:** minReplicas=2, maxReplicas=4 (CI-optimized)"
+          echo ""
+          echo "### Testes Executados"
+          echo ""
+          echo "| Teste | Habilitado | Exit Code | Status |"
+          echo "|-------|:----------:|:---------:|:------:|"
+          echo "| Health Check | ${TEST_HEALTH} | ${HEALTH_EXIT} | $( [ "${HEALTH_EXIT}" -eq 0 ] && echo "OK" || echo "FALHOU" ) |"
+          echo "| Smoke Test | ${TEST_SMOKE} | ${SMOKE_EXIT} | $( [ "${SMOKE_EXIT}" -eq 0 ] && echo "OK" || echo "FALHOU" ) |"
+          echo "| Load Test | ${TEST_LOAD} | ${LOAD_EXIT} | $( [ "${LOAD_EXIT}" -eq 0 ] && echo "OK" || echo "AVISO" ) |"
+          echo "| Stress Test | ${TEST_STRESS} | ${STRESS_EXIT} | $( [ "${STRESS_EXIT}" -eq 0 ] && echo "OK" || echo "AVISO" ) |"
+          echo "| Spike Test | ${TEST_SPIKE} | ${SPIKE_EXIT} | $( [ "${SPIKE_EXIT}" -eq 0 ] && echo "OK" || echo "AVISO" ) |"
+          echo "| Soak Test | ${TEST_SOAK} | ${SOAK_EXIT} | $( [ "${SOAK_EXIT}" -eq 0 ] && echo "OK" || echo "AVISO" ) |"
+          echo ""
+          echo "### Dashboards Visuais"
+          echo ""
+          echo "Baixe os **dashboards interativos** nos **Artefatos** do job:"
+          echo "- \`*-dashboard.html\` — Dashboards k6 com gráficos de latência, throughput, VUs"
+          echo "- \`cluster-scaling-dashboard.html\` — Dashboard de scaling com CPU, memória, réplicas"
+          echo "- \`cluster-metrics.csv\` — Dados brutos para análise adicional"
+          echo ""
+          echo "### Arquivos gerados"
+          echo ""
+          ls -1 k6/results 2>/dev/null || echo "(nenhum)"
+        } > k6/results/pipeline-summary.md
+        echo "Resumo salvo em k6/results/pipeline-summary.md"
+
+        echo ""
+        echo "=== Removendo cluster kind ==="
+        kind delete cluster --name serverest-ci || true
+      }
+
+      trap cleanup EXIT
+
+      # ================================================================
+      # Criar cluster kind
+      # ================================================================
+      echo "============================================"
+      echo "  Criando cluster kind (single-node CI)"
+      echo "============================================"
+      kind create cluster --name serverest-ci --config k8s/kind/kind-config-ci.yaml --wait 60s
+
+      echo ""
+      echo "=== Verificando cluster ==="
+      kubectl cluster-info
+      kubectl get nodes -o wide
+
+      # ================================================================
+      # Instalar metrics-server
+      # ================================================================
+      echo ""
+      echo "=== Instalando metrics-server ==="
+      kubectl apply -f k8s/kind/metrics-server.yaml
+      echo "Aguardando metrics-server ficar ready..."
+      kubectl wait --for=condition=ready pod -l k8s-app=metrics-server \
+        -n kube-system --timeout=90s
+
+      # ================================================================
+      # Deploy ServeRest
+      # ================================================================
+      echo ""
+      echo "=== Deploy ServeRest (manifests base) ==="
+      kubectl apply -f k8s/serverest/00-namespace.yaml
+      kubectl apply -f k8s/serverest/01-configmap.yaml
+      kubectl apply -f k8s/serverest/02-deployment.yaml
+      kubectl apply -f k8s/serverest/03-service.yaml
+      kubectl apply -f k8s/serverest/04-hpa.yaml
+
+      echo ""
+      echo "=== Aplicando HPA otimizado para CI ==="
+      kubectl apply -f k8s/serverest/ci-overrides/hpa-ci.yaml
+
+      echo ""
+      echo "=== Aguardando pods ficarem ready ==="
+      kubectl wait --for=condition=ready pod -l app=serverest \
+        -n serverest --timeout=120s
+      echo ""
+      echo "=== Pods ==="
+      kubectl get pods -n serverest -o wide
+      echo ""
+      echo "=== HPA ==="
+      kubectl get hpa -n serverest
+
+      # ================================================================
+      # Verificar conectividade NodePort
+      # ================================================================
+      echo ""
+      echo "=== Verificando acesso via NodePort ==="
+      for i in $(seq 1 20); do
+        if curl -sf http://localhost:30000 > /dev/null 2>&1; then
+          echo "ServeRest acessível via NodePort!"
+          break
+        fi
+        echo "Tentativa $i/20..."
+        sleep 3
+      done
+      curl -f http://localhost:30000 || { echo "ERRO: ServeRest não acessível via NodePort"; exit 1; }
+
+      # ================================================================
+      # Iniciar coleta de métricas em background
+      # ================================================================
+      echo ""
+      echo "=== Iniciando coleta de métricas (background) ==="
+      echo "timestamp,elapsed_sec,hpa_cpu_pct,hpa_mem_pct,current_replicas,desired_replicas,pod_count,total_cpu_millicores,total_mem_mib" \
+        > k6/results/cluster-metrics.csv
+
+      (
+        START_TIME="$(date +%s)"
+        while true; do
+          NOW="$(date +%s)"
+          ELAPSED="$((NOW - START_TIME))"
+          TIMESTAMP="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+
+          HPA_CPU="$(kubectl get hpa serverest-hpa -n serverest \
+            -o jsonpath='{.status.currentMetrics[?(@.resource.name=="cpu")].resource.current.averageUtilization}' 2>/dev/null)"
+          HPA_CPU="${HPA_CPU:-0}"
+
+          HPA_MEM="$(kubectl get hpa serverest-hpa -n serverest \
+            -o jsonpath='{.status.currentMetrics[?(@.resource.name=="memory")].resource.current.averageUtilization}' 2>/dev/null)"
+          HPA_MEM="${HPA_MEM:-0}"
+
+          CURRENT_REPLICAS="$(kubectl get hpa serverest-hpa -n serverest \
+            -o jsonpath='{.status.currentReplicas}' 2>/dev/null)"
+          CURRENT_REPLICAS="${CURRENT_REPLICAS:-0}"
+
+          DESIRED_REPLICAS="$(kubectl get hpa serverest-hpa -n serverest \
+            -o jsonpath='{.status.desiredReplicas}' 2>/dev/null)"
+          DESIRED_REPLICAS="${DESIRED_REPLICAS:-0}"
+
+          POD_COUNT="$(kubectl get pods -n serverest --no-headers \
+            --field-selector=status.phase=Running 2>/dev/null | wc -l | tr -d ' ')"
+
+          TOP_OUTPUT="$(kubectl top pods -n serverest --no-headers 2>/dev/null || true)"
+          if [ -n "${TOP_OUTPUT}" ]; then
+            TOTAL_CPU="$(printf "%s\n" "${TOP_OUTPUT}" | awk '{gsub(/m/,"",$2); sum+=$2} END {print sum+0}')"
+            TOTAL_MEM="$(printf "%s\n" "${TOP_OUTPUT}" | awk '{gsub(/Mi/,"",$3); sum+=$3} END {print sum+0}')"
+          else
+            TOTAL_CPU=0
+            TOTAL_MEM=0
+          fi
+
+          echo "${TIMESTAMP},${ELAPSED},${HPA_CPU},${HPA_MEM},${CURRENT_REPLICAS},${DESIRED_REPLICAS},${POD_COUNT},${TOTAL_CPU},${TOTAL_MEM}" \
+            >> k6/results/cluster-metrics.csv
+
+          echo "--- ${TIMESTAMP} (${ELAPSED}s) ---" >> k6/results/pod-metrics-detail.log
+          kubectl top pods -n serverest 2>/dev/null >> k6/results/pod-metrics-detail.log || true
+          kubectl get hpa -n serverest 2>/dev/null >> k6/results/pod-metrics-detail.log || true
+          echo "" >> k6/results/pod-metrics-detail.log
+
+          sleep 15
+        done
+      ) &
+      echo $! > /tmp/metrics-collector-pid
+      echo "Coleta de métricas iniciada (PID: $(cat /tmp/metrics-collector-pid))"
+      echo "Coletando a cada 15 segundos para k6/results/cluster-metrics.csv"
+
+      # ================================================================
+      # Executar testes condicionalmente
+      # ================================================================
+
+      if [ "${TEST_HEALTH}" = "true" ]; then
+        echo ""
+        echo "=========================================="
+        echo "  Health Check"
+        echo "=========================================="
+        set +e
+        K6_WEB_DASHBOARD_EXPORT=k6/results/health-check-dashboard.html k6 run k6/scripts/00-health-check.js
+        HEALTH_EXIT=$?
+        set -e
+      else
+        echo "Health Check desabilitado."
+      fi
+
+      if [ "${TEST_SMOKE}" = "true" ]; then
+        echo ""
+        echo "=========================================="
+        echo "  Smoke Test"
+        echo "=========================================="
+        set +e
+        K6_WEB_DASHBOARD_EXPORT=k6/results/smoke-test-dashboard.html k6 run k6/scripts/01-smoke-test.js
+        SMOKE_EXIT=$?
+        set -e
+      else
+        echo "Smoke Test desabilitado."
+      fi
+
+      # Equivalente a continue-on-error: true — não falha a pipeline
+      if [ "${TEST_LOAD}" = "true" ]; then
+        echo ""
+        echo "=========================================="
+        echo "  Load Test (não bloqueante)"
+        echo "=========================================="
+        set +e
+        K6_WEB_DASHBOARD_EXPORT=k6/results/load-test-dashboard.html k6 run k6/scripts/02-load-test.js
+        LOAD_EXIT=$?
+        set -e
+      else
+        echo "Load Test desabilitado."
+      fi
+
+      if [ "${TEST_STRESS}" = "true" ]; then
+        echo ""
+        echo "=========================================="
+        echo "  Stress Test (não bloqueante)"
+        echo "=========================================="
+        set +e
+        K6_WEB_DASHBOARD_EXPORT=k6/results/stress-test-dashboard.html k6 run k6/scripts/03-stress-test.js
+        STRESS_EXIT=$?
+        set -e
+      else
+        echo "Stress Test desabilitado."
+      fi
+
+      if [ "${TEST_SPIKE}" = "true" ]; then
+        echo ""
+        echo "=========================================="
+        echo "  Spike Test (não bloqueante)"
+        echo "=========================================="
+        set +e
+        K6_WEB_DASHBOARD_EXPORT=k6/results/spike-test-dashboard.html k6 run k6/scripts/04-spike-test.js
+        SPIKE_EXIT=$?
+        set -e
+      else
+        echo "Spike Test desabilitado."
+      fi
+
+      if [ "${TEST_SOAK}" = "true" ]; then
+        echo ""
+        echo "=========================================="
+        echo "  Soak Test (não bloqueante)"
+        echo "=========================================="
+        set +e
+        K6_WEB_DASHBOARD_EXPORT=k6/results/soak-test-dashboard.html k6 run k6/scripts/05-soak-test.js
+        SOAK_EXIT=$?
+        set -e
+      else
+        echo "Soak Test desabilitado."
+      fi
+
+      # ---- Resumo de exit codes ----
+      echo ""
+      echo "=== Resumo dos Testes ==="
+      echo "Health Check: exit=${HEALTH_EXIT}"
+      echo "Smoke Test:   exit=${SMOKE_EXIT}"
+      echo "Load Test:    exit=${LOAD_EXIT}"
+      echo "Stress Test:  exit=${STRESS_EXIT}"
+      echo "Spike Test:   exit=${SPIKE_EXIT}"
+      echo "Soak Test:    exit=${SOAK_EXIT}"
+
+      # Falha a pipeline apenas se testes críticos falharam
+      if [ "${TEST_HEALTH}" = "true" ] && [ "${HEALTH_EXIT}" -ne 0 ]; then
+        echo "ERRO: Health Check falhou (exit code ${HEALTH_EXIT})"
+        exit 1
+      fi
+      if [ "${TEST_SMOKE}" = "true" ] && [ "${SMOKE_EXIT}" -ne 0 ]; then
+        echo "ERRO: Smoke Test falhou (exit code ${SMOKE_EXIT})"
+        exit 1
+      fi
+
+  artifacts:
+    when: always
+    expire_in: 30 days
+    paths:
+      - k6/results/*.json
+      - k6/results/*.html
+      - k6/results/*.csv
+      - k6/results/*.png
+      - k6/results/*.log
+      - k6/results/pipeline-summary.md
