@@ -1,6 +1,7 @@
 # Configuração otimizada para CI (GitHub Actions runner)
 # - 1 node apenas (vs 3 em produção) para economizar recursos
 # - Mapeamento de porta 30000 mantido para compatibilidade
+# - WSL2/local: porta acessível em http://localhost:30000
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 

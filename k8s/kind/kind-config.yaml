@@ -1,5 +1,9 @@
 # Configuração do cluster kind para as aulas de DevOps
 # Este cluster possui 1 control-plane e 2 worker nodes para demonstrar scaling
+#
+# WSL2: A porta 30000 fica acessível em localhost dentro do WSL.
+#   Para acessar do browser do Windows: http://localhost:30000
+#   (o WSL2 faz proxy automático de portas para o Windows)
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 

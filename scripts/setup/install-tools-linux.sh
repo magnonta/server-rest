@@ -28,6 +28,17 @@ detect_arch() {
 
 ARCH=$(detect_arch)
 
+# Detectar se systemd está disponível (WSL2 geralmente não tem)
+start_docker_service() {
+    if pidof systemd &>/dev/null; then
+        systemctl start docker
+        systemctl enable docker
+    else
+        # WSL2 sem systemd — usa service (SysVinit)
+        service docker start
+    fi
+}
+
 echo -e "${BOLD}========================================${RESET}"
 echo -e "${BOLD}  INSTALAÇÃO AUTOMÁTICA - Linux${RESET}"
 echo -e "${BOLD}========================================${RESET}"
@@ -48,8 +59,7 @@ apt-get update -qq
 if ! command -v docker &> /dev/null; then
     echo -e "${YELLOW}Instalando Docker...${RESET}"
     apt-get install -y docker.io
-    systemctl start docker
-    systemctl enable docker
+    start_docker_service
     
     # Adicionar usuário ao grupo docker
     if [ ! -z "$SUDO_USER" ]; then

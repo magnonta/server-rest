@@ -53,6 +53,20 @@ detect_arch() {
     esac
 }
 
+is_systemd_available() {
+    pidof systemd &>/dev/null
+}
+
+start_docker_service() {
+    if is_systemd_available; then
+        systemctl start docker
+        systemctl enable docker
+    else
+        # WSL2 sem systemd — usa service (SysVinit)
+        service docker start
+    fi
+}
+
 # ============================================================================
 # VERIFICAÇÃO DE FERRAMENTAS
 # ============================================================================
@@ -155,8 +169,9 @@ install_linux() {
     # Verificar sudo
     if [ "$EUID" -ne 0 ]; then
         echo -e "${YELLOW}⚠️  Este script requer privilégios sudo${RESET}"
-        echo -e "${BLUE}🔄 Executando com sudo...${RESET}"
-        exec sudo "$0" "$@"
+        echo -e "${BLUE}🔄 Solicitando sudo...${RESET}"
+        sudo -v || { echo -e "${RED}❌ Falha ao obter sudo${RESET}"; exit 1; }
+        exec sudo -E "$0" "$@"
     fi
     
     case "$distro" in
@@ -206,8 +221,7 @@ install_debian_based() {
         apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
         
         # Iniciar e habilitar Docker
-        systemctl start docker
-        systemctl enable docker
+        start_docker_service
         
         # Adicionar usuário ao grupo docker
         if [ ! -z "$SUDO_USER" ]; then
@@ -280,8 +294,7 @@ install_redhat_based() {
     if ! check_tool docker; then
         echo -e "${YELLOW}📦 Instalando Docker...${RESET}"
         dnf install -y docker 2>/dev/null || yum install -y docker
-        systemctl start docker
-        systemctl enable docker
+        start_docker_service
         usermod -aG docker "$SUDO_USER" 2>/dev/null || true
         echo -e "${GREEN}✅ Docker instalado${RESET}"
     fi
@@ -300,8 +313,7 @@ install_arch_based() {
     if ! check_tool docker; then
         echo -e "${YELLOW}📦 Instalando Docker...${RESET}"
         pacman -S --noconfirm docker
-        systemctl start docker
-        systemctl enable docker
+        start_docker_service
         usermod -aG docker "$SUDO_USER" 2>/dev/null || true
         echo -e "${GREEN}✅ Docker instalado${RESET}"
     fi
@@ -367,16 +379,29 @@ install_wsl2() {
     echo -e "${BOLD}${BLUE}║  INSTALAÇÃO AUTOMÁTICA - WSL2         ║${RESET}"
     echo -e "${BOLD}${BLUE}╚════════════════════════════════════════╝${RESET}"
     echo ""
-    echo -e "${YELLOW}💡 WSL2 detectado - usando instalação Linux${RESET}"
+    echo -e "${YELLOW}💡 WSL2 detectado${RESET}"
     echo ""
     
-    # WSL2 usa instalação Linux
+    # Verificar se Docker já está disponível (via Docker Desktop no Windows)
+    if command -v docker &>/dev/null && docker ps &>/dev/null 2>&1; then
+        echo -e "${GREEN}✅ Docker já disponível (provavelmente via Docker Desktop)${RESET}"
+        echo -e "${BLUE}Pulando instalação do Docker...${RESET}"
+        echo ""
+    else
+        echo -e "${YELLOW}Docker não detectado. Será instalado via Docker Engine.${RESET}"
+        echo ""
+    fi
+    
+    # Instalar como Linux
     local distro=$(detect_distro)
     install_linux "$distro"
     
-    echo -e "${YELLOW}⚠️  ATENÇÃO WSL2:${RESET}"
-    echo "  • Docker Desktop deve estar rodando no Windows"
-    echo "  • Ou use Docker Engine diretamente no WSL2"
+    echo ""
+    echo -e "${YELLOW}⚠️  DICAS WSL2:${RESET}"
+    echo "  • Se Docker Desktop estiver instalado no Windows, habilite a integração WSL2"
+    echo "    (Docker Desktop → Settings → Resources → WSL Integration)"
+    echo "  • Para acessar a API do browser do Windows: http://localhost:30000"
+    echo "  • Se 'systemctl' falhar, use: sudo service docker start"
     echo ""
 }
 
