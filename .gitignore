@@ -51,5 +51,4 @@ zap-output/
 .make-state/
 *.pid
 Makefile.original-backup
-.env.make
 /tmp/kind-logs-*
