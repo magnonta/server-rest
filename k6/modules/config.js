@@ -61,6 +61,15 @@ export const SOAK_STAGES = [
   { duration: '5m', target: 0 },    // Ramp down
 ];
 
+export const FLUXO_STAGES = [
+  { duration: '1m', target: 5 },    // Warmup
+  { duration: '2m', target: 10 },   // Ramp up moderado
+  { duration: '3m', target: 10 },   // Mantém carga
+  { duration: '1m', target: 15 },   // Pico leve
+  { duration: '2m', target: 15 },   // Mantém pico
+  { duration: '1m', target: 0 },    // Ramp down
+];
+
 // ---- Stages CI — mais curtos, mantendo pressão suficiente pro HPA ----
 
 const SMOKE_STAGES_CI = [
@@ -99,6 +108,15 @@ const SOAK_STAGES_CI = [
   { duration: '2m', target: 0 },    // Ramp down
 ];
 
+const FLUXO_STAGES_CI = [
+  { duration: '30s', target: 5 },   // Warmup rápido
+  { duration: '1m', target: 10 },   // Ramp up moderado
+  { duration: '1m30s', target: 10 },// Mantém carga
+  { duration: '30s', target: 15 },  // Pico leve
+  { duration: '1m', target: 15 },   // Mantém pico
+  { duration: '30s', target: 0 },   // Ramp down
+];
+
 // ---- Seletor de stages ----
 
 /**
@@ -112,6 +130,7 @@ export function getStages(type) {
     stress: CI_MODE ? STRESS_STAGES_CI : STRESS_STAGES,
     spike:  CI_MODE ? SPIKE_STAGES_CI  : SPIKE_STAGES,
     soak:   CI_MODE ? SOAK_STAGES_CI   : SOAK_STAGES,
+    fluxo:  CI_MODE ? FLUXO_STAGES_CI  : FLUXO_STAGES,
   };
   return stages[type] || stages.load;
 }
