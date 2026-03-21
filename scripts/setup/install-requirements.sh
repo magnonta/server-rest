@@ -43,6 +43,16 @@ detect_distro() {
     fi
 }
 
+detect_arch() {
+    local machine=$(uname -m)
+    case "$machine" in
+        x86_64)  echo "amd64" ;;
+        aarch64) echo "arm64" ;;
+        arm64)   echo "arm64" ;;
+        *)       echo "amd64" ;;  # fallback
+    esac
+}
+
 # ============================================================================
 # VERIFICAÇÃO DE FERRAMENTAS
 # ============================================================================
@@ -119,12 +129,6 @@ install_macos() {
         echo -e "${GREEN}✅ Node.js instalado${RESET}"
     fi
     
-    # Trivy (opcional mas recomendado)
-    if ! check_tool trivy; then
-        echo -e "${YELLOW}📦 Instalando Trivy (segurança)...${RESET}"
-        brew install trivy
-        echo -e "${GREEN}✅ Trivy instalado${RESET}"
-    fi
     
     echo ""
     echo -e "${BOLD}${GREEN}╔════════════════════════════════════════╗${RESET}"
@@ -212,20 +216,26 @@ install_debian_based() {
             echo -e "${YELLOW}⚠️  Execute 'newgrp docker' ou reinicie o terminal${RESET}"
         fi
     fi
-    
     # kubectl
     if ! check_tool kubectl; then
         echo -e "${YELLOW}📦 Instalando kubectl...${RESET}"
-        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+        local arch=$(detect_arch)
+        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/${arch}/kubectl"
         install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
         rm kubectl
         echo -e "${GREEN}✅ kubectl instalado${RESET}"
     fi
+
     
     # kind
     if ! check_tool kind; then
         echo -e "${YELLOW}📦 Instalando kind...${RESET}"
-        curl -Lo ./kind "https://kind.sigs.k8s.io/dl/v0.24.0/kind-linux-amd64"
+        local arch=$(detect_arch)
+        curl -Lo ./kind "https://kind.sigs.k8s.io/dl/v0.31.0/kind-linux-${arch}"
+        if [ ! -s ./kind ]; then
+            echo -e "${RED}❌ Falha no download do kind${RESET}"
+            return 1
+        fi
         chmod +x ./kind
         mv ./kind /usr/local/bin/kind
         echo -e "${GREEN}✅ kind instalado${RESET}"
@@ -249,15 +259,6 @@ install_debian_based() {
         echo -e "${GREEN}✅ Node.js instalado${RESET}"
     fi
     
-    # Trivy
-    if ! check_tool trivy; then
-        echo -e "${YELLOW}📦 Instalando Trivy (segurança)...${RESET}"
-        wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | gpg --dearmor | tee /usr/share/keyrings/trivy.gpg > /dev/null
-        echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | tee -a /etc/apt/sources.list.d/trivy.list
-        apt-get update -qq
-        apt-get install -y trivy
-        echo -e "${GREEN}✅ Trivy instalado${RESET}"
-    fi
     
     echo ""
     echo -e "${BOLD}${GREEN}╔════════════════════════════════════════╗${RESET}"
@@ -320,7 +321,8 @@ install_common_tools_manual() {
     # kubectl
     if ! check_tool kubectl; then
         echo -e "${YELLOW}📦 Instalando kubectl...${RESET}"
-        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+        local arch=$(detect_arch)
+        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/${arch}/kubectl"
         install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
         rm kubectl
         echo -e "${GREEN}✅ kubectl instalado${RESET}"
@@ -329,7 +331,12 @@ install_common_tools_manual() {
     # kind
     if ! check_tool kind; then
         echo -e "${YELLOW}📦 Instalando kind...${RESET}"
-        curl -Lo ./kind "https://kind.sigs.k8s.io/dl/v0.24.0/kind-linux-amd64"
+        local arch=$(detect_arch)
+        curl -Lo ./kind "https://kind.sigs.k8s.io/dl/v0.31.0/kind-linux-${arch}"
+        if [ ! -s ./kind ]; then
+            echo -e "${RED}❌ Falha no download do kind${RESET}"
+            return 1
+        fi
         chmod +x ./kind
         mv ./kind /usr/local/bin/kind
         echo -e "${GREEN}✅ kind instalado${RESET}"
@@ -338,10 +345,12 @@ install_common_tools_manual() {
     # k6
     if ! check_tool k6; then
         echo -e "${YELLOW}📦 Instalando k6...${RESET}"
-        curl -Lo k6.tar.gz https://github.com/grafana/k6/releases/download/v0.48.0/k6-v0.48.0-linux-amd64.tar.gz
+        local arch=$(detect_arch)
+        local k6_version="v1.6.1"
+        curl -Lo k6.tar.gz "https://github.com/grafana/k6/releases/download/${k6_version}/k6-${k6_version}-linux-${arch}.tar.gz"
         tar -xzf k6.tar.gz
-        mv k6-v0.48.0-linux-amd64/k6 /usr/local/bin/
-        rm -rf k6.tar.gz k6-v0.48.0-linux-amd64
+        mv k6-${k6_version}-linux-${arch}/k6 /usr/local/bin/
+        rm -rf k6.tar.gz k6-${k6_version}-linux-${arch}
         echo -e "${GREEN}✅ k6 instalado${RESET}"
     fi
     
@@ -400,7 +409,6 @@ main() {
     echo "  • kind"
     echo "  • k6"
     echo "  • Node.js"
-    echo "  • Trivy (opcional)"
     echo ""
     
     read -p "Continuar com a instalação? [s/N] " -n 1 -r

@@ -15,6 +15,19 @@ YELLOW='\033[1;33m'
 BOLD='\033[1m'
 RESET='\033[0m'
 
+# Detectar arquitetura do sistema
+detect_arch() {
+    local machine=$(uname -m)
+    case "$machine" in
+        x86_64)  echo "amd64" ;;
+        aarch64) echo "arm64" ;;
+        arm64)   echo "arm64" ;;
+        *)       echo "amd64" ;;  # fallback
+    esac
+}
+
+ARCH=$(detect_arch)
+
 echo -e "${BOLD}========================================${RESET}"
 echo -e "${BOLD}  INSTALAÇÃO AUTOMÁTICA - Linux${RESET}"
 echo -e "${BOLD}========================================${RESET}"
@@ -51,7 +64,7 @@ fi
 # kubectl
 if ! command -v kubectl &> /dev/null; then
     echo -e "${YELLOW}Instalando kubectl...${RESET}"
-    curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+    curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/${ARCH}/kubectl"
     install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
     rm kubectl
     echo -e "${GREEN}✅ kubectl instalado${RESET}"
@@ -62,7 +75,11 @@ fi
 # kind
 if ! command -v kind &> /dev/null; then
     echo -e "${YELLOW}Instalando kind...${RESET}"
-    curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.31.0/kind-linux-amd64
+    curl -Lo ./kind "https://kind.sigs.k8s.io/dl/v0.31.0/kind-linux-${ARCH}"
+    if [ ! -s ./kind ]; then
+        echo -e "${RED}❌ Falha no download do kind${RESET}"
+        exit 1
+    fi
     chmod +x ./kind
     mv ./kind /usr/local/bin/kind
     echo -e "${GREEN}✅ kind instalado${RESET}"

@@ -1,9 +1,9 @@
 #!/bin/bash
 # ============================================================================
-# INSTALLATION SMOKE TEST
+# TESTE DE VERIFICAÇÃO DA INSTALAÇÃO
 # ============================================================================
-# Tests that all installed tools work correctly with basic functionality
-# Creates minimal resources and cleans up after itself
+# Testa se todas as ferramentas instaladas funcionam corretamente
+# Cria recursos mínimos e faz limpeza após os testes
 # ============================================================================
 
 set -e
@@ -236,7 +236,6 @@ if [ $TEST_FAILED -eq 0 ]; then
     echo -e "${BOLD}Next steps:${RESET}"
     echo "  1. make bootstrap     # Create full environment"
     echo "  2. make lab-aula-01   # Run load testing lab"
-    echo "  3. make lab-aula-02   # Run security testing lab"
     echo ""
     exit 0
 else
