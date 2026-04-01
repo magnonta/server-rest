@@ -11,7 +11,8 @@ import {
   criarUsuario,
   fazerLogin,
   listarProdutos,
-  listarUsuarios,
+  criarCarrinho,
+  concluirCompra,
   thinkTime,
 } from '../modules/serverest-api.js';
 
@@ -35,8 +36,8 @@ export default function () {
   const iterationId = __ITER;
   const uniqueEmail = `stress-${vuId}-${iterationId}-${timestamp}@test.com`;
 
-  // Cenário simplificado para stress
-  group('Operações Básicas', () => {
+  // Cenário de stress: fluxo de compra completo
+  group('Fluxo de Compra Completo', () => {
     try {
       // 1. Criar usuário
       const userData = {
@@ -63,12 +64,42 @@ export default function () {
       
       sleep(0.5);
       
-      // 3. Listar recursos (operação comum)
-      listarProdutos(BASE_URL);
-      sleep(0.3);
-      
-      listarUsuarios(BASE_URL);
-      sleep(0.3);
+      if (token) {
+        // 3. Listar produtos para poder adicionar ao carrinho
+        const produtosRes = listarProdutos(BASE_URL);
+        sleep(0.3);
+        
+        // Se listarProdutos teve sucesso, simularemos a adição do item ao carrinho
+        if (produtosRes.status === 200) {
+          const produtos = produtosRes.json('produtos');
+          
+          if (produtos && produtos.length > 0) {
+            const produtoSorteado = produtos[Math.floor(Math.random() * produtos.length)];
+            
+            // 4. Criar carrinho
+            const cartRes = criarCarrinho(BASE_URL, token, [
+              {
+                idProduto: produtoSorteado._id,
+                quantidade: 1
+              }
+            ]);
+            
+            if (cartRes.status !== 201) {
+              errorCounter.add(1);
+            }
+            
+            sleep(0.5);
+            
+            // 5. Concluir a compra (isso limpa o carrinho para possibilitar futuras ações do VU)
+            if (cartRes.status === 201) {
+              const buyRes = concluirCompra(BASE_URL, token);
+              if (buyRes.status !== 200) {
+                errorCounter.add(1);
+              }
+            }
+          }
+        }
+      }
       
     } catch (error) {
       errorCounter.add(1);
